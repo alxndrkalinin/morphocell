@@ -19,7 +19,7 @@ jobs:
     - name: Run Flake8
       run: flake8
     - name: Run mypy
-      run: mypy -–ignore-missing-imports morphocell/
+      run: mypy --ignore-missing-imports morphocell/
 
   formatting:
     name: Black formatting
