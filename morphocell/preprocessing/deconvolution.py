@@ -26,7 +26,7 @@ def richardson_lucy_dl2(
     tmp_dir: Union[Path, Optional[str]] = None,
     verbose: bool = False,
 ) -> Union[int, np.ndarray]:
-    """GPU-accelerated Lucy-Richardson deconvolution using DeconvoltuionLab2"""
+    """GPU-accelerated (optional) Lucy-Richardson deconvolution using DeconvoltuionLab2"""
 
     verboseprint = print if verbose else lambda *a, **k: None
 
@@ -163,14 +163,14 @@ def decon_flowdec(
 def decon_iter_finder_frc(
     image: Union[str, npt.ArrayLike],
     psf: Union[str, npt.ArrayLike],
+    metric_fn: Callable,
+    metric_kwargs: Dict,
+    metric_threshold: Union[int, float],
     max_iter: int = 25,
-    frc_threshold: float = -5.0,
-    frc_axis: str = "xy",
-    frc_bin_delta: int = 3,
     scales: Union[int, float, Tuple[int, ...], Tuple[float, ...]] = 1.0,
     verbose: bool = False,
-) -> Tuple[int, np.ndarray, List[Dict[str, List[float]]]]:
-    """finds numer of LR decon iterations using FRC resolution"""
+) -> Tuple[int, List[Dict[str, Union[int, float, np.ndarray]]]]:
+    """finds numer of LR decon iterations using image similarity metric"""
 
     verboseprint = print if verbose else lambda *a, **k: None
     if isinstance(image, str):
@@ -178,44 +178,29 @@ def decon_iter_finder_frc(
     if isinstance(psf, str):
         psf = io.imread(str(psf))
 
-    resolutions = [
-        grid_crop_resolution(image, bin_delta=frc_bin_delta, scales=scales, aggregate=None, verbose=verbose)
-    ]
     thresh_iter = 0
-    thresh_iter_image = None
+    results = [{"metric_gain": metric_threshold, "iter_image": image}]
 
-    def get_decon_observer(frc_bin_delta=frc_bin_delta, scales=scales):
-        nonlocal resolutions, thresh_iter, thresh_iter_image
+    def get_decon_observer(metric_fn, metric_kwargs):
+        nonlocal thresh_iter
 
-        def decon_observer(image, i, *args):
-            nonlocal frc_bin_delta, scales, resolutions, thresh_iter, thresh_iter_image
+        def decon_observer(curr_image, i, *args):
+            nonlocal thresh_iter
 
-            # stop computing FRC after reaching threshold to save time
-            if thresh_iter == 0:
-                resolution = grid_crop_resolution(
-                    image, bin_delta=frc_bin_delta, scales=scales, aggregate=None, verbose=verbose
-                )
-                resolutions.append(resolution)
+            # stop metric calculations after reaching threshold to save time
+            if thresh_iter == 0:  # threshold not reached
+                prev_image = results[i - 1]["iter_image"]
+                metric_gain = metric_fn(prev_image, curr_image, **metric_kwargs)
+                verboseprint(f"Iteration {i}: improvement {metric_gain:.2f}")
 
-                res_prev = np.mean(resolutions[i - 1][frc_axis])
-                res_curr = np.mean(resolutions[i][frc_axis])
-                res_diff = res_curr - res_prev
-
-                verboseprint(
-                    f"Iteration {i}, {frc_axis} resolution improvement: from {res_prev:.4f}"
-                    f" to {res_curr:.4f}, improvement {res_diff*1000:.2f} nm it^−1"
-                )
-
-                if (i > 1) and (res_diff * 1000 > frc_threshold):
+                if (i > 1) and (metric_gain > metric_threshold):  # threshold reached
                     thresh_iter = i
-                    thresh_iter_image = image
-                    verboseprint(
-                        f"\n{frc_threshold} nm it^−1 threshold reached at iteration {i} for {frc_axis} axis\n"
-                    )
+                    results.append({"metric_gain": metric_gain, "iter_image": curr_image})
+                    verboseprint(f"\nThreshold {metric_threshold} reached at iteration {i}.\n")
 
         return decon_observer
 
-    observer = get_decon_observer(frc_bin_delta=frc_bin_delta, scales=scales)
+    observer = get_decon_observer(metric_fn=metric_fn, metric_kwargs=metric_kwargs)
     _ = decon_flowdec(image, psf, n_iter=max_iter, voxel_sizes=scales, observer_fn=observer, verbose=verbose)
 
-    return (thresh_iter, thresh_iter_image, resolutions)
+    return (thresh_iter, results)

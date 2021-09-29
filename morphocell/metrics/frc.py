@@ -316,3 +316,21 @@ def five_crop_resolution(
         "xy": aggregate_fn(xy_resolutions, axis=0),
         "xz": aggregate_fn(xz_resolutions, axis=0),
     }
+
+
+def frc_resolution_difference(
+    image1: npt.ArrayLike,
+    image2: npt.ArrayLike,
+    scales: Union[int, float, Sequence[Union[int, float]]] = 1.0,
+    axis: str = "xy",
+    frc_bin_delta: int = 3,
+    aggregate: Callable = np.mean,
+    verbose: bool = False,
+):
+    image1_res = grid_crop_resolution(
+        image1, bin_delta=frc_bin_delta, scales=scales, aggregate=aggregate, verbose=verbose
+    )
+    image2_res = grid_crop_resolution(
+        image2, bin_delta=frc_bin_delta, scales=scales, aggregate=aggregate, verbose=verbose
+    )
+    return image1_res[axis] - image2_res[axis]
