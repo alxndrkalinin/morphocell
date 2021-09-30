@@ -156,13 +156,14 @@ def decon_flowdec(
     return fl_decon_image.astype(np.uint16)
 
 
-def decon_iter_finder_frc(
+def decon_iter_num_finder(
     image: Union[str, npt.ArrayLike],
     psf: Union[str, npt.ArrayLike],
     metric_fn: Callable,
     metric_kwargs: Dict,
     metric_threshold: Union[int, float],
     max_iter: int = 25,
+    pad_size_z: int = 1,
     scales: Union[int, float, Tuple[int, ...], Tuple[float, ...]] = 1.0,
     verbose: bool = False,
 ) -> Tuple[int, List[Dict[str, Union[int, float, np.ndarray]]]]:
@@ -179,12 +180,13 @@ def decon_iter_finder_frc(
     def get_decon_observer(metric_fn, metric_kwargs):
         nonlocal thresh_iter
 
-        def decon_observer(curr_image, i, *args):
+        def decon_observer(restored_image, i, *args):
             nonlocal thresh_iter
 
             # stop metric calculations after reaching threshold to save time
             if thresh_iter == 0:  # threshold not reached
                 prev_image = results[i - 1]["iter_image"]
+                curr_image = restored_image[pad_size_z : prev_image.shape[0] + pad_size_z, :, :]
                 metric_gain = metric_fn(prev_image, curr_image, **metric_kwargs)
                 verboseprint(f"Iteration {i}: improvement {metric_gain:.2f}")
 
