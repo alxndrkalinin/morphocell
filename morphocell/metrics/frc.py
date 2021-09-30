@@ -340,4 +340,4 @@ def frc_resolution_difference(
         aggregate=aggregate,
         verbose=verbose,
     )
-    return image1_res[axis] - image2_res[axis]
+    return aggregate(image1_res[axis]) - aggregate(image2_res[axis])
