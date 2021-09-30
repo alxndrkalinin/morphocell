@@ -1,10 +1,10 @@
-"""Implements 3D image deconvolution using DeconvolutionLab2 or FlowDec"""
+"""Implement 3D image deconvolution using DeconvolutionLab2 or FlowDec."""
 
 import subprocess
 
 import numpy as np
 import numpy.typing as npt
-from typing import Union, Tuple, Optional, Callable, List, Dict, Sequence
+from typing import Union, Tuple, Optional, Callable, List, Dict
 from pathlib import Path
 
 from skimage import io
@@ -14,8 +14,6 @@ from flowdec import data as fd_data
 from flowdec import restoration as fd_restoration
 
 from image_utils import pad_image, rescale_isotropic
-from frc import grid_crop_resolution
-from utils import print_mean_std
 
 
 def richardson_lucy_dl2(
@@ -26,8 +24,7 @@ def richardson_lucy_dl2(
     tmp_dir: Union[Path, Optional[str]] = None,
     verbose: bool = False,
 ) -> Union[int, np.ndarray]:
-    """GPU-accelerated (optional) Lucy-Richardson deconvolution using DeconvoltuionLab2"""
-
+    """Perform GPU-accelerated (optional) Lucy-Richardson deconvolution using DeconvoltuionLab2."""
     verboseprint = print if verbose else lambda *a, **k: None
 
     tmp_dir = Path(tmp_dir) if tmp_dir is not None else Path.cwd()
@@ -94,8 +91,7 @@ def richardson_lucy_flowdec(
     device: Optional[str] = None,
     verbose: bool = False,
 ) -> np.ndarray:
-    """GPU-accelerated Lucy-Richardson deconvolution using FlowDec (TensorFlow)"""
-
+    """Perform GPU-accelerated Lucy-Richardson deconvolution using FlowDec (TensorFlow)."""
     verboseprint = print if verbose else lambda *a, **k: None
 
     image = image if isinstance(image, np.ndarray) else io.imread(image)
@@ -128,7 +124,7 @@ def decon_flowdec(
     device: Optional[str] = None,
     verbose: bool = False,
 ) -> np.ndarray:
-
+    """Perform FlowDec deconvolution with image padding and rescaling."""
     if isinstance(image, str):
         image = io.imread(str(image))
     if isinstance(psf, str):
@@ -170,8 +166,7 @@ def decon_iter_finder_frc(
     scales: Union[int, float, Tuple[int, ...], Tuple[float, ...]] = 1.0,
     verbose: bool = False,
 ) -> Tuple[int, List[Dict[str, Union[int, float, np.ndarray]]]]:
-    """finds numer of LR decon iterations using image similarity metric"""
-
+    """Find numer of LR decon iterations using image similarity metric."""
     verboseprint = print if verbose else lambda *a, **k: None
     if isinstance(image, str):
         image = io.imread(str(image))
@@ -201,6 +196,13 @@ def decon_iter_finder_frc(
         return decon_observer
 
     observer = get_decon_observer(metric_fn=metric_fn, metric_kwargs=metric_kwargs)
-    _ = decon_flowdec(image, psf, n_iter=max_iter, voxel_sizes=scales, observer_fn=observer, verbose=verbose)
+    _ = decon_flowdec(
+        image,
+        psf,
+        n_iter=max_iter,
+        voxel_sizes=scales,
+        observer_fn=observer,
+        verbose=verbose,
+    )
 
     return (thresh_iter, results)

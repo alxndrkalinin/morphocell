@@ -1,12 +1,9 @@
-"""Implements 2D/3D Fourier Ring/Shell Correlation"""
+"""Implements 2D/3D Fourier Ring/Shell Correlation."""
 
 from typing import Union, Sequence, Callable, Dict, Optional
 import numpy.typing as npt
 import numpy as np
 
-from miplib.data.containers.fourier_correlation_data import (
-    FourierCorrelationDataCollection,
-)
 import miplib.analysis.resolution.fourier_ring_correlation as frc
 import miplib.analysis.resolution.fourier_shell_correlation as fsc
 import miplib.ui.cli.miplib_entry_point_options as options
@@ -24,8 +21,9 @@ from image_utils import (
 )
 
 
-def _empty_aggregate(*a: npt.ArrayLike, **k):
-    return a[0]
+def _empty_aggregate(*args: npt.ArrayLike, **kwargs) -> npt.ArrayLike:
+    """Return unchaged array."""
+    return args[0]
 
 
 def calculate_frc(
@@ -35,7 +33,7 @@ def calculate_frc(
     return_resolution: bool = True,
     verbose: bool = False,
 ) -> Union[Sequence, float]:
-
+    """Calculate FRC-based 2D image resolution."""
     verboseprint = print if verbose else lambda *a, **k: None
 
     if isinstance(scales, int) or isinstance(scales, float):
@@ -88,7 +86,7 @@ def calculate_fsc(
     z_correction: float = 1.0,
     verbose: bool = False,
 ):
-
+    """Calculate FSC-based 3D image resolution."""
     verboseprint = print if verbose else lambda *a, **k: None
 
     assert img_cube.shape[0] == img_cube.shape[1] == img_cube.shape[2]
@@ -121,7 +119,7 @@ def grid_crop_resolution(
     aggregate: Optional[Callable] = np.median,
     verbose: bool = False,
 ) -> Dict[str, npt.ArrayLike]:
-
+    """Calculate FRC-based 3D image resolution by tiling and taking 2D slices along XY and XZ."""
     if not return_resolution or aggregate is None:
         aggregate_fn = _empty_aggregate
     else:
@@ -257,7 +255,7 @@ def five_crop_resolution(
     aggregate: Callable = np.median,
     verbose: bool = False,
 ) -> Dict[str, npt.ArrayLike]:
-
+    """Calculate FRC-based 3D image resolution by taking 2D slices along XY and XZ at 4 corners and the center."""
     if not return_resolution or aggregate is None:
         aggregate_fn = _empty_aggregate
     else:
@@ -326,11 +324,20 @@ def frc_resolution_difference(
     frc_bin_delta: int = 3,
     aggregate: Callable = np.mean,
     verbose: bool = False,
-):
+) -> float:
+    """Calculate difference between FRC-based resulutions of two images."""
     image1_res = grid_crop_resolution(
-        image1, bin_delta=frc_bin_delta, scales=scales, aggregate=aggregate, verbose=verbose
+        image1,
+        bin_delta=frc_bin_delta,
+        scales=scales,
+        aggregate=aggregate,
+        verbose=verbose,
     )
     image2_res = grid_crop_resolution(
-        image2, bin_delta=frc_bin_delta, scales=scales, aggregate=aggregate, verbose=verbose
+        image2,
+        bin_delta=frc_bin_delta,
+        scales=scales,
+        aggregate=aggregate,
+        verbose=verbose,
     )
     return image1_res[axis] - image2_res[axis]
