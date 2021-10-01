@@ -4,7 +4,7 @@ import subprocess
 
 import numpy as np
 import numpy.typing as npt
-from typing import Union, Tuple, Optional, Callable, List, Dict
+from typing import Union, Tuple, Optional, Callable, List, Dict, Any
 from pathlib import Path
 
 from skimage import io
@@ -160,8 +160,8 @@ def decon_iter_num_finder(
     image: Union[str, npt.ArrayLike],
     psf: Union[str, npt.ArrayLike],
     metric_fn: Callable,
-    metric_kwargs: Dict,
     metric_threshold: Union[int, float],
+    metric_kwargs: Optional[Dict[str, Any]] = None,
     max_iter: int = 25,
     pad_size_z: int = 1,
     scales: Union[int, float, Tuple[int, ...], Tuple[float, ...]] = 1.0,
@@ -173,6 +173,8 @@ def decon_iter_num_finder(
         image = io.imread(str(image))
     if isinstance(psf, str):
         psf = io.imread(str(psf))
+    if metric_kwargs is None:
+        metric_kwargs = {}
 
     thresh_iter = 0
     results = [{"metric_gain": metric_threshold, "iter_image": image}]
@@ -186,14 +188,17 @@ def decon_iter_num_finder(
             # stop metric calculations after reaching threshold to save time
             if thresh_iter == 0:  # threshold not reached
                 prev_image = results[i - 1]["iter_image"]
-                curr_image = restored_image[pad_size_z : prev_image.shape[0] + pad_size_z, :, :]
+                curr_image = restored_image[pad_size_z : prev_image.shape[0] + pad_size_z, :, :].astype(np.uint16)
                 metric_gain = metric_fn(prev_image, curr_image, **metric_kwargs)
                 results.append({"metric_gain": metric_gain, "iter_image": curr_image})
-                verboseprint(f"Iteration {i}: improvement {metric_gain:.2f}")
+                verboseprint(f"Iteration {i}: improvement {metric_gain:.4f}")
 
                 if (i > 1) and (metric_gain > metric_threshold):  # threshold reached
                     thresh_iter = i
-                    verboseprint(f"\nThreshold {metric_threshold} reached at iteration {i}.\n")
+                    verboseprint(
+                        f"\nThreshold {metric_threshold} reached at iteration {i}"
+                        f" with improvement {metric_gain:.4f}.\n"
+                    )
 
         return decon_observer
 
