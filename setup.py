@@ -10,7 +10,7 @@ REQUIRES_PYTHON = ">=3.6.0"
 LICENSE = "MIT"
 
 INSTALL_REQUIRES = ["numpy>=1.17.0", "scikit-image>=0.16.1"]
-EXTRAS_REQUIRE = {"decon": ["flowdec>=1.1.0"], "frc": ["frc", "miplib>=1.0.6"]}
+EXTRAS_REQUIRE = {"decon": ["flowdec>=1.1.0"], "frc": ["miplib>=1.0.6"]}
 EXCLUDE_FROM_PACKAGES = ["examples"]
 
 
