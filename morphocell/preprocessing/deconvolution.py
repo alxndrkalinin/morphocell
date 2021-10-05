@@ -191,13 +191,16 @@ def decon_iter_num_finder(
                 curr_image = restored_image[pad_size_z : prev_image.shape[0] + pad_size_z, :, :].astype(np.uint16)
                 metric_gain = metric_fn(prev_image, curr_image, **metric_kwargs)
                 results.append({"metric_gain": metric_gain, "iter_image": curr_image})
-                verboseprint(f"Iteration {i}: improvement {metric_gain:.4f}")
+                verboseprint(f"Iteration {i}: improvement {metric_gain:.8f}")
 
                 if (i > 1) and (metric_gain > metric_threshold):  # threshold reached
                     thresh_iter = i
+                    metric_gain_total = metric_fn(results[0], results[-1], **metric_kwargs)
+
                     verboseprint(
                         f"\nThreshold {metric_threshold} reached at iteration {i}"
-                        f" with improvement {metric_gain:.4f}.\n"
+                        f" with improvement: {metric_gain:.8f}.\n"
+                        f"Metric between original and restored images: {metric_gain_total:.8f}.\n"
                     )
 
         return decon_observer
