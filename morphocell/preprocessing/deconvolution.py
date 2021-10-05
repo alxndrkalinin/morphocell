@@ -195,7 +195,7 @@ def decon_iter_num_finder(
 
                 if (i > 1) and (metric_gain > metric_threshold):  # threshold reached
                     thresh_iter = i
-                    metric_gain_total = metric_fn(results[0], results[-1], **metric_kwargs)
+                    metric_gain_total = metric_fn(results[0]["iter_image"], results[-1]["iter_image"], **metric_kwargs)
 
                     verboseprint(
                         f"\nThreshold {metric_threshold} reached at iteration {i}"
