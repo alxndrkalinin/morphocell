@@ -340,4 +340,4 @@ def frc_resolution_difference(
         aggregate=aggregate,
         verbose=verbose,
     )
-    return aggregate(image1_res[axis]) - aggregate(image2_res[axis])
+    return aggregate(image2_res[axis]) - aggregate(image1_res[axis]) * 1000  # return diff in nm
