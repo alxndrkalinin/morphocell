@@ -1,6 +1,6 @@
 """Implements 2D/3D Fourier Ring/Shell Correlation."""
 
-from typing import Union, Sequence, Callable, Dict, Optional
+from typing import Union, Sequence, Callable, Dict, Optional, Tuple
 import numpy.typing as npt
 import numpy as np
 
@@ -320,17 +320,19 @@ def five_crop_resolution(
 def frc_resolution_difference(
     image1: npt.ArrayLike,
     image2: npt.ArrayLike,
-    scales: Union[int, float, Sequence[Union[int, float]]] = 1.0,
+    scales: Union[int, float, Tuple[int, ...], Tuple[float, ...]] = 1.0,
     axis: str = "xy",
     frc_bin_delta: int = 3,
     aggregate: Callable = np.mean,
     verbose: bool = False,
 ) -> float:
     """Calculate difference between FRC-based resulutions of two images."""
+    if isinstance(scales, int) or isinstance(scales, float):
+        scales = (scales, scales, scales)
     if np.any(np.asarray(scales) != 1.0):
         image1 = rescale_isotropic(image1, voxel_sizes=scales)
         image2 = rescale_isotropic(image2, voxel_sizes=scales)
-        
+
     image1_res = grid_crop_resolution(
         image1,
         bin_delta=frc_bin_delta,
