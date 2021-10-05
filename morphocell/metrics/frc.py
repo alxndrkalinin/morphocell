@@ -18,6 +18,7 @@ from ..image_utils import (
     crop_center,
     pad_image,
     get_xy_block_coords,
+    rescale_isotropic,
 )
 
 
@@ -326,6 +327,10 @@ def frc_resolution_difference(
     verbose: bool = False,
 ) -> float:
     """Calculate difference between FRC-based resulutions of two images."""
+    if np.any(np.asarray(scales) != 1.0):
+        image1 = rescale_isotropic(image1, voxel_sizes=scales)
+        image2 = rescale_isotropic(image2, voxel_sizes=scales)
+        
     image1_res = grid_crop_resolution(
         image1,
         bin_delta=frc_bin_delta,
@@ -340,4 +345,4 @@ def frc_resolution_difference(
         aggregate=aggregate,
         verbose=verbose,
     )
-    return aggregate(image2_res[axis]) - aggregate(image1_res[axis]) * 1000  # return diff in nm
+    return (aggregate(image2_res[axis]) - aggregate(image1_res[axis])) * 1000  # return diff in nm
