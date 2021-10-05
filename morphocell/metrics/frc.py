@@ -9,7 +9,7 @@ import miplib.analysis.resolution.fourier_shell_correlation as fsc
 import miplib.ui.cli.miplib_entry_point_options as options
 from miplib.data.containers.image import Image
 
-from image_utils import (
+from ..image_utils import (
     max_project,
     crop_tl,
     crop_bl,

@@ -13,7 +13,7 @@ from pyvirtualdisplay import Display
 from flowdec import data as fd_data
 from flowdec import restoration as fd_restoration
 
-from image_utils import pad_image, rescale_isotropic
+from ..image_utils import pad_image, rescale_isotropic
 
 
 def richardson_lucy_dl2(

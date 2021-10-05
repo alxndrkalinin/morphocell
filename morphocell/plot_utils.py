@@ -6,7 +6,7 @@ import numpy.typing as npt
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
-from image_utils import max_project
+from .image_utils import max_project
 
 
 def show_image(
