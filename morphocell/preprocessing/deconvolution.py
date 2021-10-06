@@ -98,7 +98,7 @@ def richardson_lucy_flowdec(
     psf = psf if isinstance(psf, np.ndarray) else io.imread(psf)
 
     assert image.shape == psf.shape
-    verboseprint(f"Deconvolving {image.shape=} with {psf.shape=}")
+    verboseprint(f"Deconvolving image shape {image.shape} with psf shape {psf.shape}")
 
     algo = fd_restoration.RichardsonLucyDeconvolver(
         image.ndim,

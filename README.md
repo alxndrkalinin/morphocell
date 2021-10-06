@@ -4,10 +4,15 @@ MorphoCell is a Python library for morphomeric analysis of 3D cell images.
 
 ## Installation
 
-The project could be installed from source by doing the following (requires Python >= 3.6):
+Tested with:
+* Python 3.8, 3.9
+* Ubuntu 18.04
+* CUDA 11.2
+
+The project can be installed from source as following:
 
 ```bash
 git clone https://github.com/alxndrkalinin/morphocell.git
 cd morphocell
-pip install -e .
+pip install -e .[all]
 ```
