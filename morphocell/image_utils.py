@@ -3,7 +3,6 @@
 import numpy as np
 from skimage.transform import rescale
 from skimage.exposure import rescale_intensity
-from skimage.filters import gaussian, threshold_otsu
 
 from typing import Tuple, Union, List, Dict, Sequence
 import numpy.typing as npt
@@ -153,7 +152,7 @@ def random_crop(
         return img[y1:y2, x1:x2]
 
 
-def get_xy_block_coords(image_shape: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]) -> np.ndarray:
+def get_xy_block_coords(image_shape: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]) -> npt.ArrayLike:
     """Compute coordinates of non-overlapping image blocks of specified shape."""
     crop_h, crop_w = (crop_hw, crop_hw) if isinstance(crop_hw, int) else crop_hw
     height, width = image_shape[1:]
@@ -166,14 +165,6 @@ def get_xy_block_coords(image_shape: npt.ArrayLike, crop_hw: Union[int, Tuple[in
     return np.asarray(block_coords)
 
 
-def get_xy_block(image: npt.ArrayLike, tile_coords: List[int]) -> np.ndarray:
+def get_xy_block(image: npt.ArrayLike, tile_coords: List[int]) -> npt.ArrayLike:
     """Slice subvolume of 3D image by XY coordinates."""
     return image[:, tile_coords[0] : tile_coords[1], tile_coords[2] : tile_coords[3]]
-
-
-def threshold(image: npt.ArrayLike) -> npt.ArrayLike:
-    """Perform otsu's thresholding with Gaussian blur."""
-    image = gaussian(image, sigma=5)
-    thresh = threshold_otsu(image)
-    binary = image > thresh
-    return binary
