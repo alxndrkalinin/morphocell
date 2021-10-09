@@ -165,6 +165,14 @@ def get_xy_block_coords(image_shape: npt.ArrayLike, crop_hw: Union[int, Tuple[in
     return np.asarray(block_coords)
 
 
-def get_xy_block(image: npt.ArrayLike, tile_coords: List[int]) -> npt.ArrayLike:
+def get_xy_block(image: npt.ArrayLike, patch_coordinates: List[int]) -> npt.ArrayLike:
     """Slice subvolume of 3D image by XY coordinates."""
-    return image[:, tile_coords[0] : tile_coords[1], tile_coords[2] : tile_coords[3]]
+    return image[:, patch_coordinates[0] : patch_coordinates[1], patch_coordinates[2] : patch_coordinates[3]]
+
+
+def extract_patches(image: npt.ArrayLike, patch_coordinates: List[List[int]]) -> List[npt.ArrayLike]:
+    """Extract 3D patches from image given XY coordinates."""
+    patches = []
+    for patch_coords in patch_coordinates:
+        patches.append(get_xy_block(image, patch_coords))
+    return patches
