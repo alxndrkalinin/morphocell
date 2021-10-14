@@ -31,11 +31,11 @@ def select_nonempty_patches(
     patch_coordinates = get_xy_block_coords(image.shape, patch_size)
     verboseprint(f"Nonzero pixels in the image: {np.count_nonzero(binary_image) / binary_image.size}")
 
-    for patch_coords in patch_coordinates:
-        binary_tile = get_xy_block(binary_image, patch_coordinates)
+    for single_patch_coords in patch_coordinates:
+        binary_tile = get_xy_block(binary_image, single_patch_coords)
         patch_nonzero = np.count_nonzero(binary_tile) / binary_tile.size
 
         if patch_nonzero >= min_nonzeros:
-            selected_patches.append(patch_coords)
+            selected_patches.append(single_patch_coords)
 
     return selected_patches
