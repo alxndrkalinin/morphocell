@@ -4,7 +4,7 @@ import numpy as np
 from skimage.transform import rescale
 from skimage.exposure import rescale_intensity
 
-from typing import Tuple, Union, List, Dict, Sequence
+from typing import Tuple, Union, List, Dict, Sequence, Optional
 import numpy.typing as npt
 
 # image operations assume ZYX channel order
@@ -32,10 +32,18 @@ def rescale_isotropic(
     voxel_sizes: Union[Tuple[int, ...], Tuple[float, ...]],
     downscale_xy: bool = False,
     order: int = 3,
+    target_z_size: Optional[int] = None,
 ) -> np.ndarray:
-    """Rescale image in XY to isotropic voxel size."""
-    xz_ratio = voxel_sizes[1] / voxel_sizes[0]
-    factors = (1.0, xz_ratio, xz_ratio) if downscale_xy else (1 / xz_ratio, 1.0, 1.0)
+    """Rescale image to isotropic voxels with arbitary Z size."""
+    z_size_per_spacing = (img.shape[0] * voxel_sizes[0] / np.asarray(voxel_sizes)).astype(int)
+
+    if target_z_size is None:
+        if downscale_xy:
+            target_z_size = img.shape[0]
+        else:
+            target_z_size = z_size_per_spacing[1]
+
+    factors = target_z_size / z_size_per_spacing
     return rescale(img, factors, order=order, preserve_range=True, anti_aliasing=downscale_xy)
 
 
