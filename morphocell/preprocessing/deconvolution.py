@@ -8,12 +8,16 @@ from typing import Union, Tuple, Optional, Callable, List, Dict, Any
 from pathlib import Path
 
 from skimage import io
-from pyvirtualdisplay import Display
 
 from flowdec import data as fd_data
 from flowdec import restoration as fd_restoration
 
 from ..image_utils import pad_image, rescale_isotropic
+
+try:
+    from pyvirtualdisplay import Display
+except Exception:
+    pass
 
 
 def richardson_lucy_dl2(
@@ -98,7 +102,7 @@ def richardson_lucy_flowdec(
     psf = psf if isinstance(psf, np.ndarray) else io.imread(psf)
 
     assert image.shape == psf.shape
-    verboseprint(f"Deconvolving image shape {image.shape} with psf shape {psf.shape}")
+    verboseprint(f"Deconvolving image shape {image.shape} with psf shape {psf.shape} for {n_iter} iterations.")
 
     algo = fd_restoration.RichardsonLucyDeconvolver(
         image.ndim,
@@ -169,6 +173,7 @@ def decon_iter_num_finder(
 ) -> Tuple[int, List[Dict[str, Union[int, float, np.ndarray]]]]:
     """Find numer of LR decon iterations using image similarity metric."""
     verboseprint = print if verbose else lambda *a, **k: None
+
     if isinstance(image, str):
         image = io.imread(str(image))
     if isinstance(psf, str):
