@@ -1,28 +1,42 @@
 """Implements utility functions that operate on 3D images."""
 
-import numpy as np
-from skimage.transform import rescale
-from skimage.exposure import rescale_intensity
-
 from typing import Tuple, Union, List, Dict, Sequence, Optional
 import numpy.typing as npt
+
+try:
+    from cupy.cuda.runtime import getDeviceCount
+
+    if getDeviceCount() > 0:
+        import cupy as xp
+        from cucim.skimage.transform import rescale
+        from cucim.skimage.exposure import rescale_intensity
+
+        device_name = "GPU"
+    else:
+        raise
+except Exception:
+    import numpy as xp
+    from skimage.transform import rescale
+    from skimage.exposure import rescale_intensity
+
+    device_name = "CPU"
 
 # image operations assume ZYX channel order
 
 
 def image_stats(img: npt.ArrayLike, q: Tuple[float, float] = (0.1, 99.9)) -> Dict[str, float]:
     """Compute intensity image statistics (min, max, mean, percentiles)."""
-    q_min, q_max = np.percentile(img, q=q)
+    q_min, q_max = xp.percentile(img, q=q)
     return {
-        "min": np.min(img),
-        "max": np.max(img),
-        "mean": np.mean(img),
+        "min": xp.min(img),
+        "max": xp.max(img),
+        "mean": xp.mean(img),
         "percentile_min": q_min,
         "precentile_max": q_max,
     }
 
 
-def rescale_xy(img: npt.ArrayLike, factor: float = 1.0, anti_aliasing=True) -> np.ndarray:
+def rescale_xy(img: npt.ArrayLike, factor: float = 1.0, anti_aliasing=True) -> xp.ndarray:
     """Rescale image in XY."""
     return rescale(img, (1.0, factor, factor), preserve_range=False, anti_aliasing=anti_aliasing)
 
@@ -33,9 +47,9 @@ def rescale_isotropic(
     downscale_xy: bool = False,
     order: int = 3,
     target_z_size: Optional[int] = None,
-) -> np.ndarray:
+) -> xp.ndarray:
     """Rescale image to isotropic voxels with arbitary Z size."""
-    z_size_per_spacing = (img.shape[0] * voxel_sizes[0] / np.asarray(voxel_sizes)).astype(int)
+    z_size_per_spacing = (img.shape[0] * voxel_sizes[0] / xp.asarray(voxel_sizes)).astype(int)
 
     if target_z_size is None:
         if downscale_xy:
@@ -47,21 +61,21 @@ def rescale_isotropic(
     return rescale(img, factors, order=order, preserve_range=True, anti_aliasing=downscale_xy)
 
 
-def normalize_min_max(img: npt.ArrayLike, q: Tuple[float, float] = (0.1, 99.9)) -> np.ndarray:
+def normalize_min_max(img: npt.ArrayLike, q: Tuple[float, float] = (0.1, 99.9)) -> xp.ndarray:
     """Normalize image intensities between percentiles."""
-    vmin, vmax = np.percentile(img, q=q)
-    return rescale_intensity(img, in_range=(vmin, vmax), out_range=np.float32)
+    vmin, vmax = xp.percentile(img, q=q)
+    return rescale_intensity(img, in_range=(vmin, vmax), out_range=xp.float32)
 
 
-def max_project(img: npt.ArrayLike, axis: int = 0) -> np.ndarray:
+def max_project(img: npt.ArrayLike, axis: int = 0) -> xp.ndarray:
     """Compute maximum intensity projection along the chosen axis."""
-    return np.max(img, axis)
+    return xp.max(img, axis)
 
 
 def img_mse(a, b) -> int:
     """Calculate pixel-wise MSE between two images."""
     assert len(a) == len(b)
-    return np.square(a - b).mean()
+    return xp.square(a - b).mean()
 
 
 def pad_image(
@@ -69,14 +83,14 @@ def pad_image(
     pad_size: Union[int, Sequence[int]],
     axis: int = 0,
     mode: str = "reflect",
-) -> np.ndarray:
+) -> xp.ndarray:
     """Pad an image."""
-    npad = np.asarray([(0, 0)] * img.ndim)
+    npad = xp.asarray([(0, 0)] * img.ndim)
     npad[axis] = [pad_size] * 2 if isinstance(pad_size, int) else pad_size
-    return np.pad(img, pad_width=npad, mode=mode)
+    return xp.pad(img, pad_width=npad, mode=mode)
 
 
-def pad_image_to_cube(img: npt.ArrayLike, cube_size: int) -> np.ndarray:
+def pad_image_to_cube(img: npt.ArrayLike, cube_size: int) -> xp.ndarray:
     """Pad all image axis up to cubic shape."""
     for i, dim in enumerate(img.shape):
         if dim < cube_size:
@@ -87,31 +101,31 @@ def pad_image_to_cube(img: npt.ArrayLike, cube_size: int) -> np.ndarray:
     return img
 
 
-def crop_tl(img: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]) -> np.ndarray:
+def crop_tl(img: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]) -> xp.ndarray:
     """Crop left top corner."""
     crop_h, crop_w = (crop_hw, crop_hw) if isinstance(crop_hw, int) else crop_hw
     return img[:, :crop_h, :crop_w]
 
 
-def crop_bl(img: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]) -> np.ndarray:
+def crop_bl(img: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]) -> xp.ndarray:
     """Crop left bottom corner."""
     crop_h, crop_w = (crop_hw, crop_hw) if isinstance(crop_hw, int) else crop_hw
     return img[:, -crop_h:, :crop_w]
 
 
-def crop_tr(img: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]) -> np.ndarray:
+def crop_tr(img: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]) -> xp.ndarray:
     """Crop right top corner."""
     crop_h, crop_w = (crop_hw, crop_hw) if isinstance(crop_hw, int) else crop_hw
     return img[:, :crop_h, -crop_w:]
 
 
-def crop_br(img: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]) -> np.ndarray:
+def crop_br(img: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]) -> xp.ndarray:
     """Crop right bottom corner."""
     crop_h, crop_w = (crop_hw, crop_hw) if isinstance(crop_hw, int) else crop_hw
     return img[:, -crop_h:, -crop_w:]
 
 
-def crop_center(img: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]) -> np.ndarray:
+def crop_center(img: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]) -> xp.ndarray:
     """Crop from the center of the image."""
     crop_h, crop_w = (crop_hw, crop_hw) if isinstance(crop_hw, int) else crop_hw
 
@@ -148,11 +162,11 @@ def random_crop(
     img: npt.ArrayLike,
     crop_hw: Union[int, Tuple[int, int]],
     return_coordinates: bool = False,
-) -> np.ndarray:
+) -> xp.ndarray:
     """Crop from a random location in the image."""
     crop_h, crop_w = (crop_hw, crop_hw) if isinstance(crop_hw, int) else crop_hw
     height, width = img.shape[1:]
-    h_start, w_start = np.random.uniform(), np.random.uniform()
+    h_start, w_start = xp.random.uniform(), xp.random.uniform()
     x1, y1, x2, y2 = get_random_crop_coords(height, width, crop_h, crop_w, h_start, w_start)
     if return_coordinates:
         return (img[y1:y2, x1:x2], (y1, y2, x1, x2))
@@ -160,25 +174,25 @@ def random_crop(
         return img[y1:y2, x1:x2]
 
 
-def get_xy_block_coords(image_shape: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]) -> npt.ArrayLike:
+def get_xy_block_coords(image_shape: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]) -> xp.ndarray:
     """Compute coordinates of non-overlapping image blocks of specified shape."""
     crop_h, crop_w = (crop_hw, crop_hw) if isinstance(crop_hw, int) else crop_hw
     height, width = image_shape[1:]
 
     block_coords = []
-    for y in np.arange(0, height // crop_h) * crop_h:
-        for x in np.arange(0, width // crop_w) * crop_w:
+    for y in xp.arange(0, height // crop_h) * crop_h:
+        for x in xp.arange(0, width // crop_w) * crop_w:
             block_coords.append((y, y + crop_h, x, x + crop_w))
 
-    return np.asarray(block_coords)
+    return xp.asarray(block_coords).astype(int)
 
 
-def get_xy_block(image: npt.ArrayLike, patch_coordinates: List[int]) -> npt.ArrayLike:
+def get_xy_block(image: npt.ArrayLike, patch_coordinates: List[int]) -> xp.ndarray:
     """Slice subvolume of 3D image by XY coordinates."""
     return image[:, patch_coordinates[0] : patch_coordinates[1], patch_coordinates[2] : patch_coordinates[3]]
 
 
-def extract_patches(image: npt.ArrayLike, patch_coordinates: List[List[int]]) -> List[npt.ArrayLike]:
+def extract_patches(image: npt.ArrayLike, patch_coordinates: List[List[int]]) -> List[xp.ndarray]:
     """Extract 3D patches from image given XY coordinates."""
     patches = []
     for patch_coords in patch_coordinates:
