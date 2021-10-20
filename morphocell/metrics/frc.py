@@ -2,13 +2,16 @@
 
 from typing import Union, Sequence, Callable, Dict, Optional, Tuple
 import numpy.typing as npt
-import numpy as np
 
+import miplib.processing.image as imops
+import miplib.data.iterators.fourier_ring_iterators as iterators
+from miplib.data.containers.fourier_correlation_data import FourierCorrelationData, FourierCorrelationDataCollection
+import miplib.analysis.resolution.analysis as fsc_analysis
 import miplib.analysis.resolution.fourier_ring_correlation as frc
 import miplib.analysis.resolution.fourier_shell_correlation as fsc
 import miplib.ui.cli.miplib_entry_point_options as options
-from miplib.data.containers.image import Image
 
+from ..image import Image
 from ..image_utils import (
     max_project,
     crop_tl,
@@ -19,12 +22,155 @@ from ..image_utils import (
     pad_image,
     get_xy_block_coords,
     rescale_isotropic,
+    pad_image_to_cube,
+    hamming_window,
+    pad_images_to_matching_shape,
 )
+
+import numpy as np
+
+try:
+    from cupy.cuda.runtime import getDeviceCount
+
+    if getDeviceCount() > 0:
+        device_name = "GPU"
+        import cupy as xp
+
+        asnumpy = xp.asnumpy
+    else:
+        raise
+except Exception:
+    device_name = "CPU"
+    xp = np
+    asnumpy = np.asarray
 
 
 def _empty_aggregate(*args: npt.ArrayLike, **kwargs) -> npt.ArrayLike:
     """Return unchaged array."""
     return args[0]
+
+
+# https://github.com/sakoho81/miplib/blob/public/miplib/analysis/resolution/fourier_ring_correlation.py
+class FRC(object):
+    """A class for calcuating 2D Fourier ring correlation."""
+
+    def __init__(self, image1, image2, iterator):
+        """Create new FRC executable object and perform FFT on input images."""
+        assert isinstance(image1, Image)
+        assert isinstance(image2, Image)
+
+        if image1.shape != image2.shape or tuple(image1.spacing) != tuple(image2.spacing):
+            raise ValueError("The image dimensions do not match")
+        if image1.ndim != 2:
+            raise ValueError("Fourier ring correlation requires 2D images.")
+
+        self.pixel_size = image1.spacing[0]
+
+        # Expand to square
+        # image1 = imops.zero_pad_to_cube(image1)
+        # image2 = imops.zero_pad_to_cube(image2)
+        image1 = pad_image_to_cube(image1, np.max(image1.shape), mode="constant")
+        image2 = pad_image_to_cube(image2, np.max(image1.shape), mode="constant")
+
+        self.iterator = iterator
+        # Calculate power spectra for the input images.
+        self.fft_image1 = xp.fft.fftshift(xp.fft.fft2(image1))
+        self.fft_image2 = xp.fft.fftshift(xp.fft.fft2(image2))
+
+        # Get the Nyquist frequency
+        self.freq_nyq = int(xp.floor(image1.shape[0] / 2.0))
+
+    def execute(self):
+        """Calculate the FRC."""
+        radii = self.iterator.radii
+        c1 = xp.zeros(radii.shape, dtype=xp.float32)
+        c2 = xp.zeros(radii.shape, dtype=xp.float32)
+        c3 = xp.zeros(radii.shape, dtype=xp.float32)
+        points = xp.zeros(radii.shape, dtype=xp.float32)
+
+        for ind_ring, idx in self.iterator:
+            subset1 = self.fft_image1[ind_ring]
+            subset2 = self.fft_image2[ind_ring]
+            c1[idx] = asnumpy(xp.sum(subset1 * xp.conjugate(subset2)).real)
+            c2[idx] = xp.sum(xp.abs(subset1) ** 2)
+            c3[idx] = xp.sum(xp.abs(subset2) ** 2)
+
+            points[idx] = len(subset1)
+
+        # Calculate FRC
+        spatial_freq = asnumpy(radii.astype(xp.float32) / self.freq_nyq)
+        c1 = asnumpy(c1)
+        c1 = asnumpy(c2)
+        c1 = asnumpy(c3)
+        n_points = asnumpy(points)
+
+        with np.errstate(divide="ignore", invalid="ignore"):
+            frc = np.abs(c1) / np.sqrt(c2 * c3)
+            frc[frc == np.inf] = 0.0
+            frc = np.nan_to_num(frc)
+
+        data_set = FourierCorrelationData()
+        data_set.correlation["correlation"] = frc
+        data_set.correlation["frequency"] = spatial_freq
+        data_set.correlation["points-x-bin"] = n_points
+
+        return data_set
+
+
+# https://github.com/sakoho81/miplib/blob/public/miplib/analysis/resolution/fourier_ring_correlation.py
+def calculate_single_image_frc(image, args, average=True, trim=True, z_correction=1):
+    """Calculate a regular FRC with a single image input.
+
+    :param image: the image as an Image object
+    :param args:  the parameters for the FRC calculation. See *miplib.ui.frc_options*
+                  for details
+    :return:      returns the FRC result as a FourierCorrelationData object
+    """
+    assert isinstance(image, Image)
+
+    frc_data = FourierCorrelationDataCollection()
+
+    # Hamming Windowing
+    if not args.disable_hamming:
+        spacing = image.spacing
+        image = Image(hamming_window(image), spacing)
+
+    # Split and make sure that the images are the same size
+    image1, image2 = imops.checkerboard_split(image)
+    # image1, image2 = imops.reverse_checkerboard_split(image)
+    image1, image2 = pad_images_to_matching_shape(image1, image2)
+
+    # Run FRC
+    iterator = iterators.FourierRingIterator(image1.shape, args.d_bin)
+    frc_task = FRC(image1, image2, iterator)
+    frc_data[0] = frc_task.execute()
+
+    if average:
+        # Split and make sure that the images are the same size
+        image1, image2 = imops.reverse_checkerboard_split(image)
+        image1, image2 = pad_images_to_matching_shape(image1, image2)
+        iterator = iterators.FourierRingIterator(image1.shape, args.d_bin)
+        frc_task = FRC(image1, image2, iterator)
+
+        frc_data[0].correlation["correlation"] *= 0.5
+        frc_data[0].correlation["correlation"] += 0.5 * frc_task.execute().correlation["correlation"]
+
+    def func(x, a, b, c, d):
+        return a * np.exp(c * (x - b)) + d
+
+    params = [0.95988146, 0.97979108, 13.90441896, 0.55146136]
+
+    # Analyze results
+    analyzer = fsc_analysis.FourierCorrelationAnalysis(frc_data, image1.spacing[0], args)
+
+    result = analyzer.execute(z_correction=z_correction)[0]
+    point = result.resolution["resolution-point"][1]
+
+    cut_off_correction = func(point, *params)
+    result.resolution["spacing"] /= cut_off_correction
+    result.resolution["resolution"] /= cut_off_correction
+
+    return result
 
 
 def calculate_frc(
@@ -42,9 +188,9 @@ def calculate_frc(
     assert len(scales) == 2
 
     # check if a single image passes as an input
-    if isinstance(images, np.ndarray) or (isinstance(images, Sequence) and len(images) == 1):
+    if isinstance(images, xp.ndarray) or (isinstance(images, Sequence) and len(images) == 1):
 
-        image = images if isinstance(images, np.ndarray) else images[0]
+        image = images if isinstance(images, xp.ndarray) else images[0]
         assert image.shape[0] == image.shape[1]
         miplib_img = Image(image, scales)
         verboseprint(f"The image dimensions are {miplib_img.shape} and spacing {miplib_img.spacing} um.")
@@ -54,13 +200,13 @@ def calculate_frc(
             " --resolution-threshold-criterion=fixed"
         ).split()
         args = options.get_frc_script_options(args_list)
-        frc_result = frc.calculate_single_image_frc(miplib_img, args)
+        frc_result = calculate_single_image_frc(miplib_img, args)
 
     elif len(images) == 2:
 
         assert images[0].shape == images[1].shape
         miplib_img_1 = Image(images[0], scales)
-        miplib_img_2 = Image(image[1], scales)
+        miplib_img_2 = Image(images[1], scales)
         verboseprint(
             f"The 1st image dimensions are {miplib_img_1.shape} and spacing {miplib_img_1.spacing} um."
             f"\tThe 2nd image dimensions are {miplib_img_2.shape} and spacing {miplib_img_2.spacing} um."

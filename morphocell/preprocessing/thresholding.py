@@ -5,6 +5,8 @@ import numpy.typing as npt
 
 from ..image_utils import get_xy_block_coords, get_xy_block
 
+import numpy as np
+
 try:
     from cupy.cuda.runtime import getDeviceCount
 
@@ -17,7 +19,7 @@ try:
         raise
 except Exception:
     device_name = "CPU"
-    import numpy as xp
+    xp = np
     from skimage.filters import gaussian, threshold_otsu
 
 
