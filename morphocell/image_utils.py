@@ -7,19 +7,18 @@ try:
     from cupy.cuda.runtime import getDeviceCount
 
     if getDeviceCount() > 0:
+        device_name = "GPU"
         import cupy as xp
         from cucim.skimage.transform import rescale
         from cucim.skimage.exposure import rescale_intensity
 
-        device_name = "GPU"
     else:
         raise
 except Exception:
+    device_name = "CPU"
     import numpy as xp
     from skimage.transform import rescale
     from skimage.exposure import rescale_intensity
-
-    device_name = "CPU"
 
 # image operations assume ZYX channel order
 
