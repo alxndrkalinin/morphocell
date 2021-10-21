@@ -3,43 +3,30 @@
 import numpy as np
 
 try:
-    from cupy.cuda.runtime import getDeviceCount
+    import cupy as cp
 
-    if getDeviceCount() > 0:
-        import cupy as xp
-
+    if cp.cuda.runtime.getDeviceCount() > 0:
         device_name = "GPU"
-        asnumpy = xp.asnumpy
     else:
         raise
 except Exception:
     device_name = "CPU"
-    xp = np
-    asnumpy = np.asarray
 
 
-class Image(xp.ndarray):
+class Image:
     """A very simple extension to numpy/cupy ndarray, to contain image data and metadata."""
 
-    def __new__(cls, images, spacing, filename=None, device="CPU"):
-        """Create new Image object with metadata."""
+    def __init__(self, images, spacing, filename=None, device="CPU"):
+        """Create image object on specified device, if vaailable."""
         if device == "GPU" and device_name == "GPU":
-            obj = xp.asarray(images).view(cls)
-        elif device == "CPU" and device_name == "GPU":
-            obj = asnumpy(xp.asarray(images).view(cls))
+            self.data = cp.asarray(images)
+        elif device == "GPU" and device_name == "CPU":
+            print("\n GPU is not available! Creating Image on CPU.")
+            device = device_name
+            self.data = np.asarray(images)
         else:
-            obj = np.asarray(images).view(cls)
-            device = "CPU"
+            self.data = np.asarray(images)
 
-        obj.spacing = list(spacing)
-        obj.filename = filename
-        obj.device = device
-
-        return obj
-
-    # https://numpy.org/devdocs/user/basics.subclassing.html#the-role-of-array-finalize
-    def __array__finalize__(self, obj):
-        """Finalize the subclass of ndarray."""
-        self.spacing = getattr(obj, "spacing")
-        self.filename = getattr(obj, "filename", None)
-        self.device = getattr(obj, "device", "CPU")
+        self.spacing = tuple(spacing)
+        self.filename = filename
+        self.device = device
