@@ -12,7 +12,7 @@ from skimage import io
 from flowdec import data as fd_data
 from flowdec import restoration as fd_restoration
 
-from ..image_utils import pad_image, rescale_isotropic
+from ..image_utils import pad_image_cpu
 
 try:
     from pyvirtualdisplay import Display
@@ -123,7 +123,6 @@ def decon_flowdec(
     n_iter: int = 1,
     pad_size_z: int = 1,
     start_mode: str = "input",
-    voxel_sizes: Union[int, float, Tuple[int, ...], Tuple[float, ...]] = 1.0,
     observer_fn: Optional[Callable] = None,
     device: Optional[str] = None,
     verbose: bool = False,
@@ -133,12 +132,10 @@ def decon_flowdec(
         image = io.imread(str(image))
     if isinstance(psf, str):
         psf = io.imread(str(psf))
-    if isinstance(voxel_sizes, int) or isinstance(voxel_sizes, float):
-        voxel_sizes = (voxel_sizes, voxel_sizes, voxel_sizes)
 
     assert image.shape == psf.shape
-    padded_img = pad_image(image, pad_size_z, mode="reflect")
-    padded_psf = pad_image(psf, pad_size_z, mode="reflect")
+    padded_img = pad_image_cpu(image, pad_size_z, mode="reflect")
+    padded_psf = pad_image_cpu(psf, pad_size_z, mode="reflect")
     assert padded_img.shape == padded_psf.shape
 
     fl_decon_image = richardson_lucy_flowdec(
@@ -150,13 +147,9 @@ def decon_flowdec(
         device=device,
         verbose=verbose,
     )
-    if (voxel_sizes is not None) and (np.all(voxel_sizes != 1.0)):
-        fl_decon_image = rescale_isotropic(
-            fl_decon_image[pad_size_z : psf.shape[0] + pad_size_z, :, :],
-            voxel_sizes=voxel_sizes,
-        )
-    else:
-        fl_decon_image = fl_decon_image[pad_size_z : psf.shape[0] + pad_size_z, :, :]
+
+    fl_decon_image = fl_decon_image[pad_size_z : psf.shape[0] + pad_size_z, :, :]
+
     return fl_decon_image.astype(np.uint16)
 
 
@@ -215,7 +208,6 @@ def decon_iter_num_finder(
         image,
         psf,
         n_iter=max_iter,
-        voxel_sizes=scales,
         observer_fn=observer,
         verbose=verbose,
     )

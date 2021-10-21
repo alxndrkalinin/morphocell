@@ -92,6 +92,18 @@ def pad_image(
     return xp.pad(img, pad_width=npad, mode=mode)
 
 
+def pad_image_cpu(
+    img: npt.ArrayLike,
+    pad_size: Union[int, Sequence[int]],
+    axis: int = 0,
+    mode: str = "reflect",
+) -> xp.ndarray:
+    """Pad an image on a CPU."""
+    npad = np.asarray([(0, 0)] * img.ndim)
+    npad[axis] = [pad_size] * 2 if isinstance(pad_size, int) else pad_size
+    return np.pad(img, pad_width=npad, mode=mode)
+
+
 def pad_image_to_cube(img: npt.ArrayLike, cube_size: int, mode: str = "reflect") -> xp.ndarray:
     """Pad all image axis up to cubic shape."""
     for i, dim in enumerate(img.shape):
