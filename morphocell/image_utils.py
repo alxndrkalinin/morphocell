@@ -4,7 +4,7 @@ from typing import Tuple, Union, List, Dict, Sequence, Optional
 import numpy.typing as npt
 
 import numpy as np
-from ..image import Image
+from .image import Image
 
 try:
     from cupy.cuda.runtime import getDeviceCount
