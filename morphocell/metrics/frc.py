@@ -236,6 +236,9 @@ def calculate_fsc(
     """Calculate FSC-based 3D image resolution."""
     verboseprint = print if verbose else lambda *a, **k: None
 
+    if isinstance(scales, int) or isinstance(scales, float):
+        scales = [scales, scales, scales]
+
     assert img_cube.shape[0] == img_cube.shape[1] == img_cube.shape[2]
     miplib_img = Image(img_cube, scales)
     verboseprint(f"The image dimensions are {miplib_img.shape} and spacing {miplib_img.spacing} um.")
