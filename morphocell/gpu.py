@@ -20,6 +20,16 @@ def get_gpu_info():
     return {"num_gpus": num_gpus, "cp": cp, "cucim": cucim}
 
 
+def get_device(array):
+    """Move (or keep) array to CPU."""
+    try:
+        cp = get_gpu_info().cp
+        if isinstance(array, cp.ndarray):
+            return "GPU"
+    except Exception:
+        return "CPU"
+
+
 def asnumpy(array):
     """Move (or keep) array to CPU."""
     try:
