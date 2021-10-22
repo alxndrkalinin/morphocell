@@ -42,6 +42,7 @@ class Image:
         """Move Image data to GPU."""
         if self.gpu_info["num_gpus"] > 0:
             self.data = self._to_gpu(self.data)
+            self.device = "GPU"
         else:
             print("\n GPU requested, but is not available! Creating Image on CPU.")
             raise ImportError
