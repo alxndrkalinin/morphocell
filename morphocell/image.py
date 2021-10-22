@@ -18,9 +18,9 @@ class Image:
         else:
             assert device in ["CPU", "GPU"]
 
-        if device == "GPU" and self.gpu_info.num_gpus > 0:
+        if device == "GPU" and self.gpu_info["num_gpus"] > 0:
             self.data = self._to_gpu(images)
-        elif device == "GPU" and self.gpu_info.num_gpus == 0:
+        elif device == "GPU" and self.gpu_info["num_gpus"] == 0:
             print("\n GPU requested, but is not available! Creating Image on CPU.")
             self.data = np.asarray(images)
             device = "CPU"
@@ -34,12 +34,12 @@ class Image:
 
     def _to_gpu(self, data):
         """Move given array to GPU."""
-        img_as_float32 = self.gpu_info.cucim.skimage.util.img_as_float32
-        return img_as_float32(self.gpu_info.cp.asarray(data))
+        img_as_float32 = self.gpu_info["cucim"].skimage.util.img_as_float32
+        return img_as_float32(self.gpu_info["cp"].asarray(data))
 
     def to_gpu(self):
         """Move Image data to GPU."""
-        if self.gpu_info.num_gpus > 0:
+        if self.gpu_info["num_gpus"] > 0:
             self.data = self._to_gpu(self.data)
         else:
             print("\n GPU requested, but is not available! Creating Image on CPU.")
