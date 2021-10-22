@@ -12,6 +12,7 @@ import miplib.analysis.resolution.fourier_shell_correlation as fsc
 import miplib.ui.cli.miplib_entry_point_options as options
 
 from ..image import Image
+from ..gpu import asnumpy
 from ..image_utils import (
     max_project,
     crop_tl,
@@ -28,21 +29,6 @@ from ..image_utils import (
 )
 
 import numpy as np
-
-try:
-    from cupy.cuda.runtime import getDeviceCount
-
-    if getDeviceCount() > 0:
-        device_name = "GPU"
-        import cupy as xp
-
-        asnumpy = xp.asnumpy
-    else:
-        raise
-except Exception:
-    device_name = "CPU"
-    xp = np
-    asnumpy = np.asarray
 
 
 def _empty_aggregate(*args: npt.ArrayLike, **kwargs) -> npt.ArrayLike:
@@ -67,38 +53,36 @@ class FRC(object):
         self.pixel_size = image1.spacing[0]
 
         # Expand to square
-        # image1 = imops.zero_pad_to_cube(image1)
-        # image2 = imops.zero_pad_to_cube(image2)
         image1 = pad_image_to_cube(image1, np.max(image1.shape), mode="constant")
         image2 = pad_image_to_cube(image2, np.max(image1.shape), mode="constant")
 
         self.iterator = iterator
         # Calculate power spectra for the input images.
-        self.fft_image1 = xp.fft.fftshift(xp.fft.fft2(image1))
-        self.fft_image2 = xp.fft.fftshift(xp.fft.fft2(image2))
+        self.fft_image1 = np.fft.fftshift(np.fft.fft2(image1))
+        self.fft_image2 = np.fft.fftshift(np.fft.fft2(image2))
 
         # Get the Nyquist frequency
-        self.freq_nyq = int(xp.floor(image1.shape[0] / 2.0))
+        self.freq_nyq = int(np.floor(image1.shape[0] / 2.0))
 
     def execute(self):
         """Calculate the FRC."""
         radii = self.iterator.radii
-        c1 = xp.zeros(radii.shape, dtype=xp.float32)
-        c2 = xp.zeros(radii.shape, dtype=xp.float32)
-        c3 = xp.zeros(radii.shape, dtype=xp.float32)
-        points = xp.zeros(radii.shape, dtype=xp.float32)
+        c1 = np.zeros(radii.shape, dtype=np.float32)
+        c2 = np.zeros(radii.shape, dtype=np.float32)
+        c3 = np.zeros(radii.shape, dtype=np.float32)
+        points = np.zeros(radii.shape, dtype=np.float32)
 
         for ind_ring, idx in self.iterator:
             subset1 = self.fft_image1[ind_ring]
             subset2 = self.fft_image2[ind_ring]
-            c1[idx] = asnumpy(xp.sum(subset1 * xp.conjugate(subset2)).real)
-            c2[idx] = xp.sum(xp.abs(subset1) ** 2)
-            c3[idx] = xp.sum(xp.abs(subset2) ** 2)
+            c1[idx] = np.sum(subset1 * np.conjugate(subset2)).real
+            c2[idx] = np.sum(np.abs(subset1) ** 2)
+            c3[idx] = np.sum(np.abs(subset2) ** 2)
 
             points[idx] = len(subset1)
 
         # Calculate FRC
-        spatial_freq = asnumpy(radii.astype(xp.float32) / self.freq_nyq)
+        spatial_freq = asnumpy(radii.astype(np.float32) / self.freq_nyq)
         c1 = asnumpy(c1)
         c1 = asnumpy(c2)
         c1 = asnumpy(c3)
@@ -188,9 +172,9 @@ def calculate_frc(
     assert len(scales) == 2
 
     # check if a single image passes as an input
-    if isinstance(images, xp.ndarray) or (isinstance(images, Sequence) and len(images) == 1):
+    if isinstance(images, np.ndarray) or (isinstance(images, Sequence) and len(images) == 1):
 
-        image = images if isinstance(images, xp.ndarray) else images[0]
+        image = images if isinstance(images, np.ndarray) else images[0]
         assert image.shape[0] == image.shape[1]
         miplib_img = Image(image, scales)
         verboseprint(f"The image dimensions are {miplib_img.shape} and spacing {miplib_img.spacing} um.")

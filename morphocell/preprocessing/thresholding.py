@@ -3,30 +3,19 @@
 from typing import List
 import numpy.typing as npt
 
-from ..image_utils import get_xy_block_coords, get_xy_block
-
 import numpy as np
 
-try:
-    from cupy.cuda.runtime import getDeviceCount
+from ..image_utils import get_xy_block_coords, get_xy_block
 
-    if getDeviceCount() > 0:
-        device_name = "GPU"
-        import cupy as xp
-        from cucim.skimage.filters import gaussian, threshold_otsu
-
-    else:
-        raise
-except Exception:
-    device_name = "CPU"
-    xp = np
-    from skimage.filters import gaussian, threshold_otsu
+from ..gpu import get_image_method
 
 
-def threshold(image: npt.ArrayLike, blur_sigma=5) -> xp.ndarray:
+def threshold(image: npt.ArrayLike, blur_sigma=5):
     """Perform Otsu's thresholding with Gaussian blur."""
-    image = gaussian(image, sigma=blur_sigma)
-    thresh = threshold_otsu(image)
+    skimage_gaussian = get_image_method(image, "skimage.filters.gaussian")
+    skimage_otsu = get_image_method(image, "skimage.filters.threshold_otsu")
+    image = skimage_gaussian(image, sigma=blur_sigma)
+    thresh = skimage_otsu(image)
     binary = image > thresh
     return binary
 
@@ -43,11 +32,11 @@ def select_nonempty_patches(
     selected_patches = []
     binary_image = threshold(image)
     patch_coordinates = get_xy_block_coords(image.shape, patch_size)
-    verboseprint(f"Nonzero pixels in the image: {xp.count_nonzero(binary_image) / binary_image.size}")
+    verboseprint(f"Nonzero pixels in the image: {np.count_nonzero(binary_image) / binary_image.size}")
 
     for single_patch_coords in patch_coordinates:
         binary_tile = get_xy_block(binary_image, single_patch_coords)
-        patch_nonzero = xp.count_nonzero(binary_tile) / binary_tile.size
+        patch_nonzero = np.count_nonzero(binary_tile) / binary_tile.size
 
         if patch_nonzero >= min_nonzeros:
             selected_patches.append(single_patch_coords)

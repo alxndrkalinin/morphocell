@@ -12,7 +12,7 @@ from skimage import io
 from flowdec import data as fd_data
 from flowdec import restoration as fd_restoration
 
-from ..image_utils import pad_image_cpu
+from ..image_utils import pad_image
 
 try:
     from pyvirtualdisplay import Display
@@ -134,8 +134,8 @@ def decon_flowdec(
         psf = io.imread(str(psf))
 
     assert image.shape == psf.shape
-    padded_img = pad_image_cpu(image, pad_size_z, mode="reflect")
-    padded_psf = pad_image_cpu(psf, pad_size_z, mode="reflect")
+    padded_img = pad_image(image, pad_size_z, mode="reflect")
+    padded_psf = pad_image(psf, pad_size_z, mode="reflect")
     assert padded_img.shape == padded_psf.shape
 
     fl_decon_image = richardson_lucy_flowdec(

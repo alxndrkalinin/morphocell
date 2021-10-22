@@ -1,5 +1,6 @@
 """Contains a class for accessing GPU-accelerated libraries."""
 from importlib import import_module
+import numpy as np
 
 
 def get_gpu_info():
@@ -17,6 +18,16 @@ def get_gpu_info():
         pass
 
     return {"num_gpus": num_gpus, "cp": cp, "cucim": cucim}
+
+
+def asnumpy(array):
+    """Move (or keep) array to CPU."""
+    try:
+        cp = get_gpu_info().cp
+        if isinstance(array, cp.ndarray):
+            return cp.asnumpy(array)
+    except Exception:
+        return np.asarray(array)
 
 
 def get_image_method(array, method: str):
