@@ -34,8 +34,9 @@ class Image:
 
     def _to_gpu(self, data):
         """Move given array to GPU."""
+        data = self.gpu_info["cp"].asarray(data)
         img_as_float32 = get_image_method(data, "skimage.util.img_as_float32")
-        return img_as_float32(self.gpu_info["cp"].asarray(data))
+        return img_as_float32(data)
 
     def to_gpu(self):
         """Move Image data to GPU."""
