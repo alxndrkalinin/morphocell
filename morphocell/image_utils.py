@@ -5,45 +5,36 @@ import numpy.typing as npt
 
 import numpy as np
 
-from .image import Image
-from .utils import gpuable, cpu_deps
+from .gpu import get_image_method
 
 # image operations assume ZYX channel order
 
 
-@gpuable
 def image_stats(
     img: npt.ArrayLike,
     q: Tuple[float, float] = (0.1, 99.9),
-    deps: Optional[Dict] = None,
 ) -> Dict[str, float]:
     """Compute intensity image statistics (min, max, mean, percentiles)."""
-    deps = deps if deps is not None else cpu_deps()
-    q_min, q_max = deps["xp"].percentile(img, q=q)
+    q_min, q_max = np.percentile(img, q=q)
     return {
-        "min": deps["xp"].min(img),
-        "max": deps["xp"].max(img),
-        "mean": deps["xp"].mean(img),
+        "min": np.min(img),
+        "max": np.max(img),
+        "mean": np.mean(img),
         "percentile_min": q_min,
         "precentile_max": q_max,
     }
 
 
-@gpuable
 def rescale_xy(
     img: npt.ArrayLike,
     factor: float = 1.0,
     anti_aliasing=True,
-    deps: Optional[Dict] = None,
 ):
     """Rescale image in XY."""
-    deps = deps if deps is not None else cpu_deps()
-    return deps["xkimage"].transform.rescale(
-        img, (1.0, factor, factor), preserve_range=False, anti_aliasing=anti_aliasing
-    )
+    skimage_rescale = get_image_method(img, "skimage.transform.rescale")
+    return skimage_rescale(img, (1.0, factor, factor), preserve_range=False, anti_aliasing=anti_aliasing)
 
 
-@gpuable
 def rescale_isotropic(
     img: npt.ArrayLike,
     voxel_sizes: Union[Tuple[int, ...], Tuple[float, ...]],
@@ -53,7 +44,7 @@ def rescale_isotropic(
     deps: Optional[Dict] = None,
 ) -> npt.ArrayLike:
     """Rescale image to isotropic voxels with arbitary Z size."""
-    deps = deps if deps is not None else cpu_deps()
+    skimage_rescale = get_image_method(img, "skimage.transform.rescale")
 
     z_size_per_spacing = (img.shape[0] * voxel_sizes[0] / np.asarray(voxel_sizes)).astype(int)
     if target_z_size is None:
@@ -63,48 +54,38 @@ def rescale_isotropic(
             target_z_size = z_size_per_spacing[1]
 
     factors = target_z_size / z_size_per_spacing
-    return deps["xkimage"].transform.rescale(
-        img, factors, order=order, preserve_range=True, anti_aliasing=downscale_xy
-    )
+    return skimage_rescale(img, factors, order=order, preserve_range=True, anti_aliasing=downscale_xy)
 
 
-@gpuable
 def normalize_min_max(
     img: npt.ArrayLike,
     q: Tuple[float, float] = (0.1, 99.9),
     deps: Optional[Dict] = None,
 ):
     """Normalize image intensities between percentiles."""
-    deps = deps if deps is not None else cpu_deps()
+    skimage_rescale_intensity = get_image_method(img, "skimage.exposure.rescale_intensity")
 
-    vmin, vmax = deps["xp"].percentile(img, q=q)
-    return deps["xkimage"].exposure.rescale_intensity(img, in_range=(vmin, vmax), out_range=np.float32)
+    vmin, vmax = np.percentile(img, q=q)
+    return skimage_rescale_intensity(img, in_range=(vmin, vmax), out_range=np.float32)
 
 
-@gpuable
 def max_project(
     img: npt.ArrayLike,
     axis: int = 0,
-    deps: Optional[Dict] = None,
 ):
     """Compute maximum intensity projection along the chosen axis."""
-    deps = deps if deps is not None else cpu_deps()
-    return deps["xp"].max(img, axis)
+    return np.max(img, axis)
 
 
-@gpuable
 def img_mse(
     a,
     b,
-    deps: Optional[Dict] = None,
 ) -> int:
     """Calculate pixel-wise MSE between two images."""
-    deps = deps if deps is not None else cpu_deps()
     assert len(a) == len(b)
-    return deps["xp"].square(a - b).mean()
+    return np.square(a - b).mean()
 
 
-@gpuable
 def pad_image(
     img: npt.ArrayLike,
     pad_size: Union[int, Sequence[int]],
@@ -113,24 +94,6 @@ def pad_image(
     deps: Optional[Dict] = None,
 ):
     """Pad an image."""
-    deps = deps if deps is not None else cpu_deps()
-
-    npad = np.asarray([(0, 0)] * img.ndim)
-    npad[axis] = [pad_size] * 2 if isinstance(pad_size, int) else pad_size
-    return deps["xp"].pad(img, pad_width=npad, mode=mode)
-
-
-@gpuable
-def pad_image_cpu(
-    img: npt.ArrayLike,
-    pad_size: Union[int, Sequence[int]],
-    axis: int = 0,
-    mode: str = "reflect",
-    deps: Optional[Dict] = None,
-):
-    """Pad an image on a CPU."""
-    deps = deps if deps is not None else cpu_deps()
-
     npad = np.asarray([(0, 0)] * img.ndim)
     npad[axis] = [pad_size] * 2 if isinstance(pad_size, int) else pad_size
     return np.pad(img, pad_width=npad, mode=mode)
@@ -160,9 +123,6 @@ def pad_image_to_shape(img: npt.ArrayLike, new_shape: Sequence, mode: str = "con
 
 def pad_images_to_matching_shape(image1: npt.ArrayLike, image2: npt.ArrayLike, mode: str = "constant"):
     """Apply zero padding to make the size of two Images match."""
-    assert isinstance(image1, Image)
-    assert isinstance(image2, Image)
-
     shape = tuple(max(x, y) for x, y in zip(image1.shape, image2.shape))
 
     if any(map(lambda x, y: x != y, image1.shape, shape)):
@@ -298,13 +258,8 @@ def _nd_window(data, filter_function, power_function, **kwargs):
     return result
 
 
-@gpuable
-def hamming_window(
-    data,
-    deps: Optional[Dict] = None,
-):
+def hamming_window(data):
     """Apply Hamming window to data."""
-    deps = deps if deps is not None else cpu_deps()
-    assert issubclass(data.__class__, deps["xp"].ndarray)
+    assert issubclass(data.__class__, np.ndarray)
 
-    return _nd_window(data, deps["xp"].hamming, deps["xp"].power)
+    return _nd_window(data, np.hamming, np.power)
