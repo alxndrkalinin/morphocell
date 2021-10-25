@@ -13,6 +13,7 @@ from flowdec import data as fd_data
 from flowdec import restoration as fd_restoration
 
 from ..image_utils import pad_image
+from ..gpu import RunAsCUDASubprocess
 
 try:
     from pyvirtualdisplay import Display
@@ -86,6 +87,20 @@ def richardson_lucy_dl2(
         return -1
 
 
+@RunAsCUDASubprocess(num_gpus=1, memory_fraction=0.8)
+def _run_rl_flowdec(image, psf, n_iter, start_mode, observer_fn, device):
+    algo = fd_restoration.RichardsonLucyDeconvolver(
+        image.ndim,
+        pad_mode="none",
+        start_mode=start_mode,
+        observer_fn=observer_fn,
+        device=device,
+    ).initialize()
+    data = fd_data.Acquisition(data=image, kernel=psf)
+    res = algo.run(data, niter=n_iter)
+    return res
+
+
 def richardson_lucy_flowdec(
     image: Union[str, npt.ArrayLike],
     psf: Union[str, npt.ArrayLike],
@@ -104,14 +119,8 @@ def richardson_lucy_flowdec(
     assert image.shape == psf.shape
     verboseprint(f"Deconvolving image shape {image.shape} with psf shape {psf.shape} for {n_iter} iterations.")
 
-    algo = fd_restoration.RichardsonLucyDeconvolver(
-        image.ndim,
-        pad_mode="none",
-        start_mode=start_mode,
-        observer_fn=observer_fn,
-        device=device,
-    ).initialize()
-    res = algo.run(fd_data.Acquisition(data=image, kernel=psf), niter=n_iter)
+    res = _run_rl_flowdec(image, psf, n_iter, start_mode, observer_fn, device)
+
     verboseprint(f"\nDeconvolution info: {res.info}")
 
     return res.data
