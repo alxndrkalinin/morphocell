@@ -3,7 +3,6 @@
 from typing import Union, Sequence, Callable, Dict, Optional, Tuple
 import numpy.typing as npt
 
-import miplib.processing.image as imops
 import miplib.data.iterators.fourier_ring_iterators as iterators
 from miplib.data.containers.fourier_correlation_data import FourierCorrelationData, FourierCorrelationDataCollection
 import miplib.analysis.resolution.analysis as fsc_analysis
@@ -26,6 +25,8 @@ from ..image_utils import (
     pad_image_to_cube,
     hamming_window,
     pad_images_to_matching_shape,
+    checkerboard_split,
+    reverse_checkerboard_split,
 )
 
 import numpy as np
@@ -36,21 +37,27 @@ def _empty_aggregate(*args: npt.ArrayLike, **kwargs) -> npt.ArrayLike:
     return args[0]
 
 
+def frc_checkerboard_split(image: Image, reverse=False):
+    """Split image into two by checkerboard pattern."""
+    if reverse:
+        image1, image2 = reverse_checkerboard_split(image.data)
+    else:
+        image1, image2 = checkerboard_split(image.data)
+    image1 = Image(image1, spacing=image.spacing, device=image.device)
+    image2 = Image(image2, spacing=image.spacing, device=image.device)
+    return image1, image2
+
+
 # https://github.com/sakoho81/miplib/blob/public/miplib/analysis/resolution/fourier_ring_correlation.py
 class FRC(object):
     """A class for calcuating 2D Fourier ring correlation."""
 
     def __init__(self, image1, image2, iterator):
         """Create new FRC executable object and perform FFT on input images."""
-        assert isinstance(image1, Image)
-        assert isinstance(image2, Image)
-
-        if image1.shape != image2.shape or tuple(image1.spacing) != tuple(image2.spacing):
+        if image1.shape != image2.shape:
             raise ValueError("The image dimensions do not match")
         if image1.ndim != 2:
             raise ValueError("Fourier ring correlation requires 2D images.")
-
-        self.pixel_size = image1.spacing[0]
 
         # Expand to square
         image1 = pad_image_to_cube(image1, np.max(image1.shape), mode="constant")
@@ -114,27 +121,34 @@ def calculate_single_image_frc(image, args, average=True, trim=True, z_correctio
 
     frc_data = FourierCorrelationDataCollection()
 
+    #     import pdb
+    #     pdb.set_trace()
+
     # Hamming Windowing
     if not args.disable_hamming:
         spacing = image.spacing
-        image = Image(hamming_window(image), spacing)
+        device = image.device
+        image = Image(hamming_window(image.data), spacing, device=device)
 
     # Split and make sure that the images are the same size
-    image1, image2 = imops.checkerboard_split(image)
+    image1, image2 = frc_checkerboard_split(image)
     # image1, image2 = imops.reverse_checkerboard_split(image)
-    image1, image2 = pad_images_to_matching_shape(image1, image2)
+    image1.data, image2.data = pad_images_to_matching_shape(image1.data, image2.data)
+
+    assert tuple(image1.shape) == tuple(image2.shape)
+    assert tuple(image1.spacing) == tuple(image2.spacing)
 
     # Run FRC
     iterator = iterators.FourierRingIterator(image1.shape, args.d_bin)
-    frc_task = FRC(image1, image2, iterator)
+    frc_task = FRC(image1.data, image2.data, iterator)
     frc_data[0] = frc_task.execute()
 
     if average:
         # Split and make sure that the images are the same size
-        image1, image2 = imops.reverse_checkerboard_split(image)
+        image1, image2 = frc_checkerboard_split(image, reverse=True)
         image1, image2 = pad_images_to_matching_shape(image1, image2)
         iterator = iterators.FourierRingIterator(image1.shape, args.d_bin)
-        frc_task = FRC(image1, image2, iterator)
+        frc_task = FRC(image1.data, image2.data, iterator)
 
         frc_data[0].correlation["correlation"] *= 0.5
         frc_data[0].correlation["correlation"] += 0.5 * frc_task.execute().correlation["correlation"]

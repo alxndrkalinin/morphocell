@@ -263,3 +263,63 @@ def hamming_window(data):
     assert issubclass(data.__class__, np.ndarray)
 
     return _nd_window(data, np.hamming, np.power)
+
+
+def checkerboard_split(image, disable_3d_sum=False):
+    """Split an image in two, by using a checkerboard pattern."""
+    # Make an index chess board structure
+    shape = image.shape
+    odd_index = list(np.arange(1, shape[i], 2) for i in range(len(shape)))
+    even_index = list(np.arange(0, shape[i], 2) for i in range(len(shape)))
+
+    # Create the two pseudo images
+    if image.ndim == 2:
+        image1 = image[odd_index[0], :][:, odd_index[1]]
+        image2 = image[even_index[0], :][:, even_index[1]]
+    else:
+        if disable_3d_sum:
+            image1 = image[odd_index[0], :, :][:, odd_index[1], :][:, :, odd_index[2]]
+            image2 = image[even_index[0], :, :][:, even_index[1], :][:, :, even_index[2]]
+
+        else:
+            image1 = (
+                image.astype(np.uint32)[even_index[0], :, :][:, odd_index[1], :][:, :, odd_index[2]]
+                + image.astype(np.uint32)[odd_index[0], :, :][:, odd_index[1], :][:, :, odd_index[2]]
+            )
+
+            image2 = (
+                image.astype(np.uint32)[even_index[0], :, :][:, even_index[1], :][:, :, even_index[2]]
+                + image.astype(np.uint32)[odd_index[0], :, :][:, even_index[1], :][:, :, even_index[2]]
+            )
+
+    return image1, image2
+
+
+def reverse_checkerboard_split(image, disable_3d_sum=False):
+    """Split an image in two, by using a checkerboard pattern."""
+    # Make an index chess board structure
+    shape = image.shape
+    odd_index = list(np.arange(1, shape[i], 2) for i in range(len(shape)))
+    even_index = list(np.arange(0, shape[i], 2) for i in range(len(shape)))
+
+    # Create the two pseudo images
+    if image.ndim == 2:
+        image1 = image[odd_index[0], :][:, even_index[1]]
+        image2 = image[even_index[0], :][:, odd_index[1]]
+    else:
+        if disable_3d_sum:
+            image1 = image[odd_index[0], :, :][:, odd_index[1], :][:, :, even_index[2]]
+            image2 = image[even_index[0], :, :][:, even_index[1], :][:, :, odd_index[2]]
+
+        else:
+            image1 = (
+                image.astype(np.uint32)[even_index[0], :, :][:, odd_index[1], :][:, :, even_index[2]]
+                + image.astype(np.uint32)[odd_index[0], :, :][:, even_index[1], :][:, :, odd_index[2]]
+            )
+
+            image2 = (
+                image.astype(np.uint32)[even_index[0], :, :][:, even_index[1], :][:, :, odd_index[2]]
+                + image.astype(np.uint32)[odd_index[0], :, :][:, odd_index[1], :][:, :, even_index[2]]
+            )
+
+    return image1, image2

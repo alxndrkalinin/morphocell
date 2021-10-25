@@ -46,3 +46,13 @@ class Image:
         else:
             print("\n GPU requested, but is not available! Creating Image on CPU.")
             raise ImportError
+
+    def to_cpu(self):
+        """Move (or keep) Image on CPU."""
+        try:
+            cp = self.gpu_info["cp"]
+            if isinstance(self.data, cp.ndarray):
+                self.data = cp.asnumpy(self.data)
+        except Exception:
+            self.data = np.asarray(self.data)
+        self.device = "CPU"
