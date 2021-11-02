@@ -88,6 +88,19 @@ def richardson_lucy_dl2(
 
 
 @RunAsCUDASubprocess(num_gpus=1, memory_fraction=0.8)
+def _run_rl_flowdec_subprocess(image, psf, n_iter, start_mode, observer_fn, device):
+    algo = fd_restoration.RichardsonLucyDeconvolver(
+        image.ndim,
+        pad_mode="none",
+        start_mode=start_mode,
+        observer_fn=observer_fn,
+        device=device,
+    ).initialize()
+    data = fd_data.Acquisition(data=image, kernel=psf)
+    res = algo.run(data, niter=n_iter)
+    return res
+
+
 def _run_rl_flowdec(image, psf, n_iter, start_mode, observer_fn, device):
     algo = fd_restoration.RichardsonLucyDeconvolver(
         image.ndim,
@@ -109,6 +122,7 @@ def richardson_lucy_flowdec(
     observer_fn: Optional[Callable] = None,
     device: Optional[str] = None,
     verbose: bool = False,
+    subprocess_cuda: bool = False,
 ) -> np.ndarray:
     """Perform GPU-accelerated Lucy-Richardson deconvolution using FlowDec (TensorFlow)."""
     verboseprint = print if verbose else lambda *a, **k: None
@@ -119,7 +133,10 @@ def richardson_lucy_flowdec(
     assert image.shape == psf.shape
     verboseprint(f"Deconvolving image shape {image.shape} with psf shape {psf.shape} for {n_iter} iterations.")
 
-    res = _run_rl_flowdec(image, psf, n_iter, start_mode, observer_fn, device)
+    if subprocess_cuda:
+        res = _run_rl_flowdec_subprocess(image, psf, n_iter, start_mode, observer_fn, device)
+    else:
+        res = _run_rl_flowdec(image, psf, n_iter, start_mode, observer_fn, device)
 
     verboseprint(f"\nDeconvolution info: {res.info}")
 
@@ -135,6 +152,7 @@ def decon_flowdec(
     observer_fn: Optional[Callable] = None,
     device: Optional[str] = None,
     verbose: bool = False,
+    subprocess_cuda: bool = False,
 ) -> np.ndarray:
     """Perform FlowDec deconvolution with image padding and rescaling."""
     if isinstance(image, str):
@@ -155,6 +173,7 @@ def decon_flowdec(
         observer_fn=observer_fn,
         device=device,
         verbose=verbose,
+        subprocess_cuda=subprocess_cuda,
     )
 
     fl_decon_image = fl_decon_image[pad_size_z : psf.shape[0] + pad_size_z, :, :]
@@ -172,6 +191,7 @@ def decon_iter_num_finder(
     pad_size_z: int = 1,
     scales: Union[int, float, Tuple[int, ...], Tuple[float, ...]] = 1.0,
     verbose: bool = False,
+    subprocess_cuda: bool = False,
 ) -> Tuple[int, List[Dict[str, Union[int, float, np.ndarray]]]]:
     """Find numer of LR decon iterations using image similarity metric."""
     verboseprint = print if verbose else lambda *a, **k: None
@@ -219,6 +239,7 @@ def decon_iter_num_finder(
         n_iter=max_iter,
         observer_fn=observer,
         verbose=verbose,
+        subprocess_cuda=subprocess_cuda,
     )
 
     return (thresh_iter, results)
