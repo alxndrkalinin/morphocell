@@ -52,6 +52,16 @@ def asnumpy(array):
         return np.asarray(array)
 
 
+def ascupy(array):
+    """Move (or keep) array to GPU."""
+    try:
+        cp = get_gpu_info()["cp"]
+        if isinstance(array, np.ndarray):
+            return cp.asarray(array)
+    except Exception:
+        return np.asarray(array)
+
+
 def get_image_method(array, method: str) -> Callable:
     """Return skimage or cucim.skimage method by the argument type/device."""
     module, method = method.rsplit(".", maxsplit=1)
