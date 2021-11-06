@@ -5,7 +5,7 @@ import numpy.typing as npt
 
 import numpy as np
 
-from .gpu import get_image_method
+from .gpu import get_image_method, get_array_module
 
 # image operations assume ZYX channel order
 
@@ -260,9 +260,8 @@ def _nd_window(data, filter_function, power_function, **kwargs):
 
 def hamming_window(data):
     """Apply Hamming window to data."""
-    assert issubclass(data.__class__, np.ndarray)
-
-    return _nd_window(data, np.hamming, np.power)
+    xp = get_array_module(data)
+    return _nd_window(data, xp.hamming, xp.power)
 
 
 def checkerboard_split(image, disable_3d_sum=False):

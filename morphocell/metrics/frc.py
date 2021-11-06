@@ -121,9 +121,6 @@ def calculate_single_image_frc(image, args, average=True, trim=True, z_correctio
 
     frc_data = FourierCorrelationDataCollection()
 
-    #     import pdb
-    #     pdb.set_trace()
-
     # Hamming Windowing
     if not args.disable_hamming:
         spacing = image.spacing
