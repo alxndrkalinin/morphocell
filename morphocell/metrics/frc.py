@@ -2,16 +2,16 @@
 
 from typing import Union, Sequence, Callable, Dict, Optional, Tuple
 import numpy.typing as npt
+from argparse import Namespace
 
 import miplib.data.iterators.fourier_ring_iterators as iterators
 from miplib.data.containers.fourier_correlation_data import FourierCorrelationData, FourierCorrelationDataCollection
 import miplib.analysis.resolution.analysis as fsc_analysis
-import miplib.analysis.resolution.fourier_ring_correlation as frc
 import miplib.analysis.resolution.fourier_shell_correlation as fsc
 import miplib.ui.cli.miplib_entry_point_options as options
 
 from ..image import Image
-from ..gpu import asnumpy
+from ..gpu import asnumpy, get_array_module
 from ..image_utils import (
     max_project,
     crop_tl,
@@ -109,7 +109,9 @@ class FRC(object):
 
 
 # https://github.com/sakoho81/miplib/blob/public/miplib/analysis/resolution/fourier_ring_correlation.py
-def calculate_single_image_frc(image, args, average=True, trim=True, z_correction=1):
+def calculate_single_image_frc(
+    image: Image, args: Namespace, average: bool = True, trim: bool = True, z_correction: int = 1
+):
     """Calculate a regular FRC with a single image input.
 
     :param image: the image as an Image object
@@ -169,7 +171,7 @@ def calculate_single_image_frc(image, args, average=True, trim=True, z_correctio
 
 
 def calculate_frc(
-    images: Union[npt.ArrayLike, Sequence[npt.ArrayLike]],
+    image: Union[npt.ArrayLike, Image],
     bin_delta: int = 1,
     scales: Union[int, float, Sequence] = 1.0,
     return_resolution: bool = True,
@@ -178,44 +180,27 @@ def calculate_frc(
     """Calculate FRC-based 2D image resolution."""
     verboseprint = print if verbose else lambda *a, **k: None
 
-    if isinstance(scales, int) or isinstance(scales, float):
-        scales = [scales, scales]
-    assert len(scales) == 2
-
-    # check if a single image passes as an input
-    if isinstance(images, np.ndarray) or (isinstance(images, Sequence) and len(images) == 1):
-
-        image = images if isinstance(images, np.ndarray) else images[0]
-        assert image.shape[0] == image.shape[1]
-        miplib_img = Image(image, scales)
-        verboseprint(f"The image dimensions are {miplib_img.shape} and spacing {miplib_img.spacing} um.")
-
-        args_list = (
-            f"None --bin-delta={bin_delta} --frc-curve-fit-type=smooth-spline "
-            " --resolution-threshold-criterion=fixed"
-        ).split()
-        args = options.get_frc_script_options(args_list)
-        frc_result = calculate_single_image_frc(miplib_img, args)
-
-    elif len(images) == 2:
-
-        assert images[0].shape == images[1].shape
-        miplib_img_1 = Image(images[0], scales)
-        miplib_img_2 = Image(images[1], scales)
-        verboseprint(
-            f"The 1st image dimensions are {miplib_img_1.shape} and spacing {miplib_img_1.spacing} um."
-            f"\tThe 2nd image dimensions are {miplib_img_2.shape} and spacing {miplib_img_2.spacing} um."
-        )
-
-        args_list = (
-            f"None --bin-delta={bin_delta} --frc-curve-fit-type=smooth-spline "
-            " --resolution-threshold-criterion=fixed"
-        ).split()
-        args = options.get_frc_script_options(args_list)
-        frc_result = frc.calculate_two_image_frc(miplib_img_1, miplib_img_2, args)
-
+    if isinstance(image, Image):
+        assert len(image.spacing) == 2
     else:
-        raise ValueError("FRC: incorrect input, should be one image or a list of two images")
+        xp = get_array_module(image)
+        ndarray = getattr(xp, "ndarray")  # avoid mypy complains
+        if isinstance(image, ndarray):
+            if isinstance(scales, int) or isinstance(scales, float):
+                scales = [scales, scales]
+            assert len(scales) == 2
+            image = Image(image, scales)
+        else:
+            raise ValueError("FRC: incorrect input, should be 2D Image, Numpy or CuPy array.")
+
+    assert image.shape[0] == image.shape[1]
+    verboseprint(f"The image dimensions are {image.shape} and spacing {image.spacing} um.")
+
+    args_list = (
+        f"None --bin-delta={bin_delta} --frc-curve-fit-type=smooth-spline " " --resolution-threshold-criterion=fixed"
+    ).split()
+    args = options.get_frc_script_options(args_list)
+    frc_result = calculate_single_image_frc(image, args)
 
     frc_result = frc_result.resolution["resolution"] if return_resolution else frc_result
     return frc_result
