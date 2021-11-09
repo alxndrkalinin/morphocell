@@ -180,20 +180,18 @@ def calculate_frc(
     """Calculate FRC-based 2D image resolution."""
     verboseprint = print if verbose else lambda *a, **k: None
 
-    if isinstance(image, Image):
-        assert len(image.spacing) == 2
-    else:
+    if not isinstance(image, Image):
         xp = get_array_module(image)
         ndarray = getattr(xp, "ndarray")  # avoid mypy complains
         if isinstance(image, ndarray):
             if isinstance(scales, int) or isinstance(scales, float):
                 scales = [scales, scales]
-            assert len(scales) == 2
             image = Image(image, scales)
         else:
             raise ValueError("FRC: incorrect input, should be 2D Image, Numpy or CuPy array.")
 
     assert image.shape[0] == image.shape[1]
+    assert len(image.spacing) == 2
     verboseprint(f"The image dimensions are {image.shape} and spacing {image.spacing} um.")
 
     args_list = (
@@ -240,7 +238,7 @@ def calculate_fsc(
 
 
 def grid_crop_resolution(
-    images: npt.ArrayLike,
+    image: npt.ArrayLike,
     bin_delta: int = 1,
     scales: Union[int, float, Sequence[Union[int, float]]] = 1.0,
     crop_size: int = 512,
@@ -255,24 +253,22 @@ def grid_crop_resolution(
     else:
         aggregate_fn = aggregate
 
-    # assuming we have more than 2 slices in each zstack
-    if len(images) > 2:
-        image = images
-    elif len(images) == 2:
-        image = images[0]
-        image_2 = images[1]
-    else:
-        raise ValueError("FRC: incorrect input, should be one image or a list of two images")
+    if not isinstance(image, Image):
+        xp = get_array_module(image)
+        ndarray = getattr(xp, "ndarray")  # avoid mypy complains
+        if isinstance(image, ndarray):
+            if isinstance(scales, int) or isinstance(scales, float):
+                scales = [scales, scales, scales]
+            image = Image(image, scales)
+        else:
+            raise ValueError("FRC: incorrect input, should be 2D Image, Numpy or CuPy array.")
 
-    if isinstance(scales, int) or isinstance(scales, float):
-        scales = [scales, scales, scales]
-
-    assert len(image.shape) == 3 and len(scales) == 3
+    assert len(image.shape) == 3 and len(image.spacing) == 3
     assert image.shape[0] < image.shape[1] and image.shape[0] < image.shape[2]
     assert image.shape[1] > crop_size and image.shape[2] > crop_size
 
-    scales_xy = (scales[1], scales[2])
-    scales_xz = (scales[0], scales[2])
+    scales_xy = (image.spacing[1], image.spacing[2])
+    scales_xz = (image.spacing[0], image.spacing[2])
 
     locations = get_xy_block_coords(image.shape, crop_size)
 
@@ -281,22 +277,10 @@ def grid_crop_resolution(
     xz_resolutions = []
     for y1, y2, x1, x2 in locations:
 
-        if len(image) > 2:
-            loc_image = image[:, y1:y2, x1:x2]
-            max_projection_resolution = calculate_frc(
-                max_project(loc_image), bin_delta, scales_xy, return_resolution, verbose
-            )
-        else:
-            loc_image = image[:, y1:y2, x1:x2]
-            loc_image_2 = image_2[:, y1:y2, x1:x2]
-            max_projection_resolution = calculate_frc(
-                [max_project(loc_image), max_project(loc_image_2)],
-                bin_delta,
-                scales_xy,
-                return_resolution,
-                verbose,
-            )
-
+        loc_image = image.data[:, y1:y2, x1:x2]
+        max_projection_resolution = calculate_frc(
+            max_project(loc_image), bin_delta, scales_xy, return_resolution, verbose
+        )
         max_projection_resolutions.append(max_projection_resolution)
 
         xy_slice_resolutions = []
@@ -305,65 +289,33 @@ def grid_crop_resolution(
 
         for slice_idx in range(loc_image.shape[0]):
 
-            if len(image) > 2:
-                xy_slice_resolutions.append(
-                    calculate_frc(
-                        loc_image[slice_idx, :, :],
-                        bin_delta,
-                        scales_xy,
-                        return_resolution,
-                        verbose,
-                    )
+            xy_slice_resolutions.append(
+                calculate_frc(
+                    loc_image[slice_idx, :, :],
+                    bin_delta,
+                    scales_xy,
+                    return_resolution,
+                    verbose,
                 )
+            )
 
-                xz_slice = loc_image[:, xz_slices[slice_idx], :]
+            xz_slice = loc_image[:, xz_slices[slice_idx], :]
 
-                pad_size = (xz_slice.shape[1] - xz_slice.shape[0]) // 2
-                if (xz_slice.shape[1] - xz_slice.shape[0]) % 2 != 0:
-                    pad_size = (pad_size + 1, pad_size)
+            pad_size = (xz_slice.shape[1] - xz_slice.shape[0]) // 2
+            if (xz_slice.shape[1] - xz_slice.shape[0]) % 2 != 0:
+                pad_size = (pad_size + 1, pad_size)
 
-                padded_xz_slice = pad_image(xz_slice, pad_size, 0, pad_mode)
+            padded_xz_slice = pad_image(xz_slice, pad_size, 0, pad_mode)
 
-                xz_slice_resolutions.append(
-                    calculate_frc(
-                        padded_xz_slice,
-                        bin_delta,
-                        scales_xz,
-                        return_resolution,
-                        verbose,
-                    )
+            xz_slice_resolutions.append(
+                calculate_frc(
+                    padded_xz_slice,
+                    bin_delta,
+                    scales_xz,
+                    return_resolution,
+                    verbose,
                 )
-
-            else:
-                xy_slice_resolutions.append(
-                    calculate_frc(
-                        [loc_image[slice_idx, :, :], loc_image_2[slice_idx, :, :]],
-                        bin_delta,
-                        scales_xy,
-                        return_resolution,
-                        verbose,
-                    )
-                )
-
-                xz_slice = loc_image[:, xz_slices[slice_idx], :]
-                xz_slice_2 = loc_image_2[:, xz_slices[slice_idx], :]
-
-                pad_size = (xz_slice.shape[1] - xz_slice.shape[0]) // 2
-                if (xz_slice.shape[1] - xz_slice.shape[0]) % 2 != 0:
-                    pad_size = (pad_size + 1, pad_size)
-
-                padded_xz_slice = pad_image(xz_slice, pad_size, 0, pad_mode)
-                padded_xz_slice_2 = pad_image(xz_slice_2, pad_size, 0, pad_mode)
-
-                xz_slice_resolutions.append(
-                    calculate_frc(
-                        [padded_xz_slice, padded_xz_slice_2],
-                        bin_delta,
-                        scales_xz,
-                        return_resolution,
-                        verbose,
-                    )
-                )
+            )
 
         xy_resolutions.append(xy_slice_resolutions)
         xz_resolutions.append(xz_slice_resolutions)
