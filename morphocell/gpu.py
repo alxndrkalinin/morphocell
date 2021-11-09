@@ -1,5 +1,6 @@
 """Contains a class for accessing GPU-accelerated libraries."""
 from typing import Callable, Dict, Any
+from types import ModuleType
 
 import os
 import cloudpickle
@@ -37,6 +38,15 @@ def get_device(array) -> str:
             return "CPU"
     except Exception:
         return "CPU"
+
+
+def get_array_module(array) -> ModuleType:
+    """Get the NumPy or CuPy method based on argument location."""
+    cp = get_gpu_info()["cp"]
+    if cp is not None:
+        return cp.get_array_module(array)
+    else:
+        return np
 
 
 def asnumpy(array):
