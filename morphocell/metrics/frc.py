@@ -91,8 +91,8 @@ class FRC(object):
         # Calculate FRC
         spatial_freq = asnumpy(radii.astype(np.float32) / self.freq_nyq)
         c1 = asnumpy(c1)
-        c1 = asnumpy(c2)
-        c1 = asnumpy(c3)
+        c2 = asnumpy(c2)
+        c3 = asnumpy(c3)
         n_points = asnumpy(points)
 
         with np.errstate(divide="ignore", invalid="ignore"):
@@ -402,6 +402,7 @@ def frc_resolution_difference(
     image1: npt.ArrayLike,
     image2: npt.ArrayLike,
     scales: Union[int, float, Tuple[int, ...], Tuple[float, ...]] = 1.0,
+    downscale_xy: bool = False,
     axis: str = "xy",
     frc_bin_delta: int = 3,
     aggregate: Callable = np.mean,
@@ -411,8 +412,8 @@ def frc_resolution_difference(
     if isinstance(scales, int) or isinstance(scales, float):
         scales = (scales, scales, scales)
     if np.any(np.asarray(scales) != 1.0):
-        image1 = rescale_isotropic(image1, voxel_sizes=scales)
-        image2 = rescale_isotropic(image2, voxel_sizes=scales)
+        image1 = rescale_isotropic(image1, voxel_sizes=scales, downscale_xy=downscale_xy)
+        image2 = rescale_isotropic(image2, voxel_sizes=scales, downscale_xy=downscale_xy)
 
     image1_res = grid_crop_resolution(
         image1,
