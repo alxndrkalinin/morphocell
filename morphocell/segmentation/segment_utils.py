@@ -3,13 +3,14 @@
 import numpy.typing as npt
 
 import numpy as np
-from .gpu import get_image_method
+from ..gpu import get_image_method
+from ..image_utils import pad_image
 
 
 def downsample_and_filter(image: npt.ArrayLike, downscale_factor: float = 0.5) -> npt.ArrayLike:
     """Subsample and filter image before segmenting."""
     skimage_rescale = get_image_method(image, "skimage.transform.rescale")
-    skimage_median = get_image_method(image, "skimage.filter.median")
+    skimage_median = get_image_method(image, "skimage.filters.median")
     image = skimage_rescale(image, downscale_factor, order=3, preserve_range=True, anti_aliasing=True).astype(
         np.uint16
     )
@@ -17,7 +18,23 @@ def downsample_and_filter(image: npt.ArrayLike, downscale_factor: float = 0.5) -
     return image
 
 
-def exclude_touching_objects(label_image: npt.ArrayLike, border_value: int = 100) -> npt.ArrayLike:
+def remove_small_objects(label_image: npt.ArrayLike, min_size: int = 500) -> npt.ArrayLike:
+    """Remove objects with volume below specified threshold."""
+    for mask_idx in np.unique(label_image)[1:]:
+        if (label_image == mask_idx).sum() < min_size:
+            label_image[label_image == mask_idx] = 0
+    return label_image
+
+
+def clear_xy_borders(label_image: npt.ArrayLike) -> npt.ArrayLike:
+    """Remove masks that touch XY borders."""
+    skimage_clear_border = get_image_method(label_image, "skimage.segmentation.clear_border")
+    label_image = pad_image(label_image, (1, 1), mode="constant")
+    label_image = skimage_clear_border(label_image)[1:-1, :, :]
+    return label_image
+
+
+def remove_touching_objects(label_image: npt.ArrayLike, border_value: int = 100) -> npt.ArrayLike:
     """Find labelled masks that overlap and remove from the image."""
     skimage_binary_dilation = get_image_method(label_image, "skimage.morphology.binary_dilation")
     skimage_cube = get_image_method(label_image, "skimage.morphology.cube")

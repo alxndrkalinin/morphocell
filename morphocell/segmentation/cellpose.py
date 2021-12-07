@@ -5,7 +5,7 @@ import numpy.typing as npt
 
 from cellpose import models
 
-from .segment_utils import downsample_and_filter, exclude_touching_objects
+from .segment_utils import downsample_and_filter, remove_touching_objects, clear_xy_borders, remove_small_objects
 
 
 def cellpose_eval(
@@ -31,9 +31,12 @@ def cellpose_segment(
     diameter: Optional[int] = None,
     do_3D: bool = True,
     border_value: int = 100,
+    min_size: int = 500,
 ) -> npt.ArrayLike:
     """Preprocess image, run Cellpose and postprocessing."""
     image = downsample_and_filter(image, downscale_factor=downscale_factor)
     masks = cellpose_eval(image, model_type=model_type, omni=omni, channels=channels, diameter=diameter, do_3D=do_3D)
-    masks = exclude_touching_objects(masks, border_value=border_value)
+    masks = remove_touching_objects(masks, border_value=border_value)
+    masks = clear_xy_borders(masks)
+    masks = remove_small_objects(masks, min_size=min_size)
     return masks
