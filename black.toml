@@ -21,5 +21,6 @@ exclude = '''
   | buck-out
   | build
   | dist
+  | .ipynb_checkpoints
 )/
 '''

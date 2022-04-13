@@ -35,11 +35,11 @@ def richardson_lucy_dl2(
     tmp_dir = Path(tmp_dir) if tmp_dir is not None else Path.cwd()
     tmp_dir.mkdir(parents=True, exist_ok=True)
     if isinstance(image, np.ndarray):
-        verboseprint(f"Saving original image to {tmp_dir}/tmp_image.tif")
+        verboseprint(f"Saving original image to {tmp_dir}/tmp_image.tif")  # type: ignore[operator]
         io.imsave(str(tmp_dir / "tmp_image.tif"), image)
         image = tmp_dir / "tmp_image.tif"
     if isinstance(psf, np.ndarray):
-        verboseprint(f"Saving PSF to {tmp_dir}/tmp_psf.tif")
+        verboseprint(f"Saving PSF to {tmp_dir}/tmp_psf.tif")  # type: ignore[operator]
         io.imsave(str(tmp_dir / "tmp_psf.tif"), psf)
         psf = tmp_dir / "tmp_psf.tif"
 
@@ -74,13 +74,13 @@ def richardson_lucy_dl2(
             ],
             capture_output=verbose,
         )
-        verboseprint(result)
+        verboseprint(result)  # type: ignore[operator]
 
     # read zstack again
     if result.returncode == 0:
-        verboseprint(f"Reading deconvolved image from {str(tmp_dir)}/tmp_image_RL_{n_iter}.tif")
+        verboseprint(f"Reading deconvolved image from {str(tmp_dir)}/tmp_image_RL_{n_iter}.tif")  # type: ignore[operator]
         decon_image = io.imread(str(tmp_dir / f"tmp_image_RL_{n_iter}.tif"))
-        verboseprint(f"Deconvolved image shape: {decon_image.shape}")
+        verboseprint(f"Deconvolved image shape: {decon_image.shape}")  # type: ignore[operator]
         return decon_image
     else:
         print("Deconvolution failed.")
@@ -131,14 +131,14 @@ def richardson_lucy_flowdec(
     psf = psf if isinstance(psf, np.ndarray) else io.imread(psf)
 
     assert image.shape == psf.shape
-    verboseprint(f"Deconvolving image shape {image.shape} with psf shape {psf.shape} for {n_iter} iterations.")
+    verboseprint(f"Deconvolving image shape {image.shape} with psf shape {psf.shape} for {n_iter} iterations.")  # type: ignore[operator]
 
     if subprocess_cuda:
         res = _run_rl_flowdec_subprocess(image, psf, n_iter, start_mode, observer_fn, device)
     else:
         res = _run_rl_flowdec(image, psf, n_iter, start_mode, observer_fn, device)
 
-    verboseprint(f"\nDeconvolution info: {res.info}")
+    verboseprint(f"\nDeconvolution info: {res.info}")  # type: ignore[operator]
 
     return res.data
 

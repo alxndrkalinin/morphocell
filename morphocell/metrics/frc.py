@@ -192,7 +192,7 @@ def calculate_frc(
 
     assert image.shape[0] == image.shape[1]
     assert len(image.spacing) == 2
-    verboseprint(f"The image dimensions are {image.shape} and spacing {image.spacing} um.")
+    verboseprint(f"The image dimensions are {image.shape} and spacing {image.spacing} um.")  # type: ignore[operator]
 
     args_list = (
         f"None --bin-delta={bin_delta} --frc-curve-fit-type=smooth-spline " " --resolution-threshold-criterion=fixed"
@@ -219,7 +219,7 @@ def calculate_fsc(
 
     assert img_cube.shape[0] == img_cube.shape[1] == img_cube.shape[2]
     miplib_img = Image(img_cube, scales)
-    verboseprint(f"The image dimensions are {miplib_img.shape} and spacing {miplib_img.spacing} um.")
+    verboseprint(f"The image dimensions are {miplib_img.shape} and spacing {miplib_img.spacing} um.")  # type: ignore[operator]
 
     args_list = [
         None,

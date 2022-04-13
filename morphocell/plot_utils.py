@@ -17,7 +17,7 @@ def show_image(
 ) -> Figure:
     """Display 2D image."""
     plt.figure(figsize=figsize)
-    fig = plt.imshow(img, cmap=cmap, vmin=0, vmax=2 ** bit_depth - 1)
+    fig = plt.imshow(img, cmap=cmap, vmin=0, vmax=2**bit_depth - 1)
     plt.axis("off")
     return fig
 
@@ -41,6 +41,6 @@ def show_image_error(
 ) -> Figure:
     """Display error map between teo images."""
     plt.figure(figsize=figsize)
-    fig = plt.imshow(img, cmap=cmap, vmin=(-(2 ** bit_depth) - 1), vmax=(2 ** bit_depth - 1))
+    fig = plt.imshow(img, cmap=cmap, vmin=(-(2**bit_depth) - 1), vmax=(2**bit_depth - 1))
     plt.axis("off")
     return fig

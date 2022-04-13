@@ -37,7 +37,7 @@ def select_nonempty_patches(
     binary_image = (img_as_float(image) > threshold).astype(np.uint8)
 
     patch_coordinates = get_xy_block_coords(image.shape, patch_size)
-    verboseprint(f"Nonzero pixels in the image: {np.count_nonzero(binary_image) / binary_image.size}")
+    verboseprint(f"Nonzero pixels in the image: {np.count_nonzero(binary_image) / binary_image.size}")  # type: ignore[operator]
 
     for single_patch_coords in patch_coordinates:
         binary_tile = get_xy_block(binary_image, single_patch_coords)
