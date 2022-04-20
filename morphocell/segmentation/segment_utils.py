@@ -3,6 +3,9 @@
 import numpy.typing as npt
 
 import numpy as np
+
+from ._clear_border import clear_border
+
 from ..gpu import get_image_method
 from ..image_utils import pad_image
 
@@ -28,9 +31,8 @@ def remove_small_objects(label_image: npt.ArrayLike, min_size: int = 500) -> npt
 
 def clear_xy_borders(label_image: npt.ArrayLike) -> npt.ArrayLike:
     """Remove masks that touch XY borders."""
-    skimage_clear_border = get_image_method(label_image, "skimage.segmentation.clear_border")
     label_image = pad_image(label_image, (1, 1), mode="constant")
-    label_image = skimage_clear_border(label_image)[1:-1, :, :]
+    label_image = clear_border(label_image)[1:-1, :, :]
     return label_image
 
 
