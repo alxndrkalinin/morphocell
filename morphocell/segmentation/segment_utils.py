@@ -23,17 +23,16 @@ def downsample_and_filter(image: npt.ArrayLike, downscale_factor: float = 0.5) -
 
 def remove_small_objects(label_image: npt.ArrayLike, min_size: int = 500) -> npt.ArrayLike:
     """Remove objects with volume below specified threshold."""
-    for mask_idx in np.unique(label_image)[1:]:
-        if (label_image == mask_idx).sum() < min_size:
-            label_image[label_image == mask_idx] = 0
+    remove_small_objects = get_image_method(label_image, "skimage.morphology.remove_small_objects")
+    label_image = remove_small_objects(label_image, min_size=min_size)
     return label_image
 
 
-def clear_xy_borders(label_image: npt.ArrayLike) -> npt.ArrayLike:
+def clear_xy_borders(label_image: npt.ArrayLike, buffer_size: int = 0) -> npt.ArrayLike:
     """Remove masks that touch XY borders."""
-    label_image = pad_image(label_image, (1, 1), mode="constant")
-    label_image = clear_border(label_image)[1:-1, :, :]
-    return label_image
+    label_image = pad_image(label_image, (buffer_size + 1, buffer_size + 1), mode="constant")
+    label_image = clear_border(label_image, buffer_size=buffer_size)
+    return label_image[buffer_size + 1 : -(buffer_size + 1), :, :]
 
 
 def remove_touching_objects(label_image: npt.ArrayLike, border_value: int = 100) -> npt.ArrayLike:
