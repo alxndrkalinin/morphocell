@@ -1,5 +1,6 @@
 """Implement pre- and post-processing for segmentation."""
 
+from typing import Optional
 import numpy.typing as npt
 
 import numpy as np
@@ -21,6 +22,31 @@ def downscale_and_filter(image: npt.ArrayLike, downscale_factor: float = 0.5, fi
         image = skimage_rescale(image, downscale_factor, order=3, anti_aliasing=True)
 
     return skimage_median(image, footprint=skimage_cube(filter_size))
+
+
+def cleanup_segmentation(
+    image: npt.ArrayLike,
+    min_obj_size: Optional[int] = None,
+    border_buffer_size: Optional[int] = None,
+    max_hole_size: Optional[int] = None,
+) -> npt.ArrayLike:
+    """Clean up segmented image by removing small objects, clearing borders, and closing holes."""
+    label = get_image_method(image.data, "skimage.measure.label")
+
+    # both transforms preserve labels
+    if min_obj_size is not None:
+        remove_small_objects = get_image_method(image, "skimage.morphology.remove_small_objects")
+        image = remove_small_objects(image, min_size=min_obj_size)
+
+    if border_buffer_size is not None:
+        image = clear_xy_borders(image, buffer_size=border_buffer_size)
+
+    # returns boolean array
+    if max_hole_size is not None:
+        remove_holes = get_image_method(image, "skimage.morphology.remove_small_holes")
+        image = remove_holes(image, area_threshold=max_hole_size)
+
+    return label(image).astype(np.uint8)
 
 
 def remove_small_objects(label_image: npt.ArrayLike, min_size: int = 500) -> npt.ArrayLike:
