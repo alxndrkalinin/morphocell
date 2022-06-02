@@ -10,15 +10,17 @@ from ..gpu import get_image_method
 from ..image_utils import pad_image
 
 
-def downsample_and_filter(image: npt.ArrayLike, downscale_factor: float = 0.5) -> npt.ArrayLike:
-    """Subsample and filter image before segmenting."""
+def downscale_and_filter(image: npt.ArrayLike, downscale_factor: float = 0.5, filter_size: int = 3) -> npt.ArrayLike:
+    """Subsample and filter image prior to segmentiation."""
     skimage_rescale = get_image_method(image, "skimage.transform.rescale")
+    # cuCIM does not yet support rank-based median filter that is faster on integer values
     skimage_median = get_image_method(image, "skimage.filters.median")
-    image = skimage_rescale(image, downscale_factor, order=3, preserve_range=True, anti_aliasing=True).astype(
-        np.uint16
-    )
-    image = skimage_median(image)
-    return image
+    skimage_cube = get_image_method(image, "skimage.morphology.cube")
+
+    if downscale_factor < 1.0:
+        image = skimage_rescale(image, downscale_factor, order=3, anti_aliasing=True)
+
+    return skimage_median(image, footprint=skimage_cube(filter_size))
 
 
 def remove_small_objects(label_image: npt.ArrayLike, min_size: int = 500) -> npt.ArrayLike:
