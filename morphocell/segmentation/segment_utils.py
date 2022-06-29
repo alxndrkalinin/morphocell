@@ -31,7 +31,7 @@ def cleanup_segmentation(
     max_hole_size: Optional[int] = None,
 ) -> npt.ArrayLike:
     """Clean up segmented image by removing small objects, clearing borders, and closing holes."""
-    label = get_image_method(image.data, "skimage.measure.label")
+    label = get_image_method(image, "skimage.measure.label")
 
     # both transforms preserve labels
     if min_obj_size is not None:
