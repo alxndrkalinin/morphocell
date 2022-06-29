@@ -121,8 +121,7 @@ class RunAsCUDASubprocess:
         """Spawn a separate process to run wrapped TensorFlow function."""
 
         def wrapped_f(*args):
-            mp.set_start_method("spawn")
-            with mp.Pool(1) as p:
+            with mp.get_context("spawn").Pool(1) as p:
                 return p.apply(
                     RunAsCUDASubprocess._subprocess_code,
                     (self._num_gpus, self._memory_fraction, cloudpickle.dumps(f), args),
