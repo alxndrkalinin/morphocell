@@ -27,16 +27,20 @@ def downscale_and_filter(image: npt.ArrayLike, downscale_factor: float = 0.5, fi
 def cleanup_segmentation(
     image: npt.ArrayLike,
     min_obj_size: Optional[int] = None,
+    max_obj_size: Optional[int] = None,
     border_buffer_size: Optional[int] = None,
     max_hole_size: Optional[int] = None,
 ) -> npt.ArrayLike:
     """Clean up segmented image by removing small objects, clearing borders, and closing holes."""
     label = get_image_method(image, "skimage.measure.label")
 
-    # both transforms preserve labels
+    # first 3 transforms preserve labels
     if min_obj_size is not None:
         remove_small_objects = get_image_method(image, "skimage.morphology.remove_small_objects")
         image = remove_small_objects(image, min_size=min_obj_size)
+
+    if max_obj_size is not None:
+        image = remove_large_objects(image, max_size=max_obj_size)
 
     if border_buffer_size is not None:
         image = clear_xy_borders(image, buffer_size=border_buffer_size)
@@ -47,6 +51,15 @@ def cleanup_segmentation(
         image = remove_holes(image, area_threshold=max_hole_size)
 
     return label(image).astype(np.uint8)
+
+
+def remove_large_objects(label_image: npt.ArrayLike, max_size: int = 100000) -> npt.ArrayLike:
+    """Remove objects with volume above specified threshold."""
+    label_volumes = np.bincount(label_image.ravel())
+    too_large = label_volumes > max_size
+    too_large_mask = too_large[label_image]
+    label_image[too_large_mask] = 0
+    return label_image
 
 
 def remove_small_objects(label_image: npt.ArrayLike, min_size: int = 500) -> npt.ArrayLike:

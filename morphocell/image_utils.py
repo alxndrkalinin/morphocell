@@ -64,7 +64,6 @@ def normalize_min_max(
 ):
     """Normalize image intensities between percentiles."""
     skimage_rescale_intensity = get_image_method(img, "skimage.exposure.rescale_intensity")
-
     vmin, vmax = np.percentile(img, q=q)
     return skimage_rescale_intensity(img, in_range=(vmin, vmax), out_range=np.float32)
 
