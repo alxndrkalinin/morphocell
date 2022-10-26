@@ -97,8 +97,7 @@ def _run_rl_flowdec_subprocess(image, psf, n_iter, start_mode, observer_fn, devi
         device=device,
     ).initialize()
     data = fd_data.Acquisition(data=image, kernel=psf)
-    res = algo.run(data, niter=n_iter)
-    return res
+    return algo.run(data, niter=n_iter)
 
 
 def _run_rl_flowdec(image, psf, n_iter, start_mode, observer_fn, device):
@@ -110,8 +109,7 @@ def _run_rl_flowdec(image, psf, n_iter, start_mode, observer_fn, device):
         device=device,
     ).initialize()
     data = fd_data.Acquisition(data=image, kernel=psf)
-    res = algo.run(data, niter=n_iter)
-    return res
+    return algo.run(data, niter=n_iter)
 
 
 def richardson_lucy_flowdec(

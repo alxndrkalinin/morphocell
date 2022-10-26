@@ -23,8 +23,6 @@ def get_gpu_info() -> Dict[str, Any]:
     except Exception:
         cp = None
         cucim = None
-        pass
-
     return {"num_gpus": num_gpus, "cp": cp, "cucim": cucim}
 
 
@@ -32,10 +30,7 @@ def get_device(array) -> str:
     """Move (or keep) array to CPU."""
     try:
         cp = get_gpu_info()["cp"]
-        if isinstance(array, cp.ndarray):
-            return "GPU"
-        else:
-            return "CPU"
+        return "GPU" if isinstance(array, cp.ndarray) else "CPU"
     except Exception:
         return "CPU"
 
@@ -43,22 +38,18 @@ def get_device(array) -> str:
 def get_array_module(array) -> ModuleType:
     """Get the NumPy or CuPy method based on argument location."""
     cp = get_gpu_info()["cp"]
-    if cp is not None:
-        return cp.get_array_module(array)
-    else:
-        return np
+    return cp.get_array_module(array) if cp is not None else np
 
 
 def asnumpy(array):
     """Move (or keep) array to CPU."""
-    if not isinstance(array, np.ndarray):
-        try:
-            cp = get_gpu_info()["cp"]
-            if isinstance(array, cp.ndarray):
-                return cp.asnumpy(array)
-        except Exception:
-            return np.asarray(array)
-    else:
+    if isinstance(array, np.ndarray):
+        return np.asarray(array)
+    try:
+        cp = get_gpu_info()["cp"]
+        if isinstance(array, cp.ndarray):
+            return cp.asnumpy(array)
+    except Exception:
         return np.asarray(array)
 
 
@@ -78,7 +69,7 @@ def get_image_method(array, method: str) -> Callable:
 
     try:
         if isinstance(array, get_gpu_info()["cp"].ndarray):
-            module = "cucim." + module
+            module = f"cucim.{module}"
     except Exception:
         pass
 
@@ -107,9 +98,10 @@ class RunAsCUDASubprocess:
             num_grabbed = 0
             os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
-        assert num_grabbed == num_gpus, "Could not grab {} GPU devices with {}% memory available".format(
-            num_gpus, memory_fraction * 100
-        )
+        assert (
+            num_grabbed == num_gpus
+        ), f"Could not grab {num_gpus} GPU devices with {memory_fraction * 100}% memory available"
+
         if os.environ["CUDA_VISIBLE_DEVICES"] == "":
             os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # see tensorflow issues: #16284, #2175
 

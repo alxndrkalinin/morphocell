@@ -183,13 +183,12 @@ def calculate_frc(
     if not isinstance(image, Image):
         xp = get_array_module(image)
         ndarray = getattr(xp, "ndarray")  # avoid mypy complains
-        if isinstance(image, ndarray):
-            if isinstance(scales, int) or isinstance(scales, float):
-                scales = [scales, scales]
-            image = Image(image, scales)
-        else:
+        if not isinstance(image, ndarray):
             raise ValueError("FRC: incorrect input, should be 2D Image, Numpy or CuPy array.")
 
+        if isinstance(scales, (int, float)):
+            scales = [scales, scales]
+        image = Image(image, scales)
     assert image.shape[0] == image.shape[1]
     assert len(image.spacing) == 2
     verboseprint(f"The image dimensions are {image.shape} and spacing {image.spacing} um.")  # type: ignore[operator]
@@ -214,7 +213,7 @@ def calculate_fsc(
     """Calculate FSC-based 3D image resolution."""
     verboseprint = print if verbose else lambda *a, **k: None
 
-    if isinstance(scales, int) or isinstance(scales, float):
+    if isinstance(scales, (int, float)):
         scales = [scales, scales, scales]
 
     assert img_cube.shape[0] == img_cube.shape[1] == img_cube.shape[2]
@@ -233,8 +232,9 @@ def calculate_fsc(
         "--frc-curve-fit-type=spline",
     ]
     args = options.get_frc_script_options(args_list)
-    fsc_result = fsc.calculate_one_image_sectioned_fsc(miplib_img, args, z_correction=z_correction)
-    return fsc_result
+    return fsc.calculate_one_image_sectioned_fsc(
+        miplib_img, args, z_correction=z_correction
+    )
 
 
 def grid_crop_resolution(
@@ -256,13 +256,12 @@ def grid_crop_resolution(
     if not isinstance(image, Image):
         xp = get_array_module(image)
         ndarray = getattr(xp, "ndarray")  # avoid mypy complains
-        if isinstance(image, ndarray):
-            if isinstance(scales, int) or isinstance(scales, float):
-                scales = [scales, scales, scales]
-            image = Image(image, scales)
-        else:
+        if not isinstance(image, ndarray):
             raise ValueError("FRC: incorrect input, should be 2D Image, Numpy or CuPy array.")
 
+        if isinstance(scales, (int, float)):
+            scales = [scales, scales, scales]
+        image = Image(image, scales)
     assert len(image.shape) == 3 and len(image.spacing) == 3
     assert image.shape[0] < image.shape[1] and image.shape[0] < image.shape[2]
     assert image.shape[1] > crop_size and image.shape[2] > crop_size
@@ -343,7 +342,7 @@ def five_crop_resolution(
     else:
         aggregate_fn = aggregate
 
-    if isinstance(scales, int) or isinstance(scales, float):
+    if isinstance(scales, (int, float)):
         scales = [scales, scales, scales]
 
     assert len(image.shape) == 3 and len(scales) == 3
@@ -409,7 +408,7 @@ def frc_resolution_difference(
     verbose: bool = False,
 ) -> float:
     """Calculate difference between FRC-based resulutions of two images."""
-    if isinstance(scales, int) or isinstance(scales, float):
+    if isinstance(scales, (int, float)):
         scales = (scales, scales, scales)
     if np.any(np.asarray(scales) != 1.0):
         image1 = rescale_isotropic(image1, voxel_sizes=scales, downscale_xy=downscale_xy)
