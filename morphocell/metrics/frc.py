@@ -232,9 +232,7 @@ def calculate_fsc(
         "--frc-curve-fit-type=spline",
     ]
     args = options.get_frc_script_options(args_list)
-    return fsc.calculate_one_image_sectioned_fsc(
-        miplib_img, args, z_correction=z_correction
-    )
+    return fsc.calculate_one_image_sectioned_fsc(miplib_img, args, z_correction=z_correction)
 
 
 def grid_crop_resolution(

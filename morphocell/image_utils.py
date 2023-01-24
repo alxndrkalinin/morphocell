@@ -206,12 +206,9 @@ def get_xy_block_coords(image_shape: npt.ArrayLike, crop_hw: Union[int, Tuple[in
     crop_h, crop_w = (crop_hw, crop_hw) if isinstance(crop_hw, int) else crop_hw
     height, width = image_shape[1:]
 
-    block_coords = []
+    block_coords = []  # type: List[Tuple[int, ...]]
     for y in np.arange(0, height // crop_h) * crop_h:
-        block_coords.extend(
-            (y, y + crop_h, x, x + crop_w)
-            for x in np.arange(0, width // crop_w) * crop_w
-        )
+        block_coords.extend((y, y + crop_h, x, x + crop_w) for x in np.arange(0, width // crop_w) * crop_w)
 
     return np.asarray(block_coords).astype(int)
 
@@ -223,9 +220,7 @@ def get_xy_block(image: npt.ArrayLike, patch_coordinates: List[int]):
 
 def extract_patches(image: npt.ArrayLike, patch_coordinates: List[List[int]]):
     """Extract 3D patches from image given XY coordinates."""
-    return [
-        get_xy_block(image, patch_coords) for patch_coords in patch_coordinates
-    ]
+    return [get_xy_block(image, patch_coords) for patch_coords in patch_coordinates]
 
 
 def _nd_window(data, filter_function, power_function, **kwargs):
