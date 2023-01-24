@@ -48,11 +48,7 @@ def rescale_isotropic(
 
     z_size_per_spacing = (img.shape[0] * voxel_sizes[0] / np.asarray(voxel_sizes)).astype(int)
     if target_z_size is None:
-        if downscale_xy:
-            target_z_size = img.shape[0]
-        else:
-            target_z_size = z_size_per_spacing[1]
-
+        target_z_size = img.shape[0] if downscale_xy else z_size_per_spacing[1]
     factors = target_z_size / z_size_per_spacing
     return skimage_rescale(img, factors, order=order, preserve_range=True, anti_aliasing=downscale_xy)
 
@@ -212,8 +208,10 @@ def get_xy_block_coords(image_shape: npt.ArrayLike, crop_hw: Union[int, Tuple[in
 
     block_coords = []
     for y in np.arange(0, height // crop_h) * crop_h:
-        for x in np.arange(0, width // crop_w) * crop_w:
-            block_coords.append((y, y + crop_h, x, x + crop_w))
+        block_coords.extend(
+            (y, y + crop_h, x, x + crop_w)
+            for x in np.arange(0, width // crop_w) * crop_w
+        )
 
     return np.asarray(block_coords).astype(int)
 
@@ -225,10 +223,9 @@ def get_xy_block(image: npt.ArrayLike, patch_coordinates: List[int]):
 
 def extract_patches(image: npt.ArrayLike, patch_coordinates: List[List[int]]):
     """Extract 3D patches from image given XY coordinates."""
-    patches = []
-    for patch_coords in patch_coordinates:
-        patches.append(get_xy_block(image, patch_coords))
-    return patches
+    return [
+        get_xy_block(image, patch_coords) for patch_coords in patch_coordinates
+    ]
 
 
 def _nd_window(data, filter_function, power_function, **kwargs):
@@ -267,28 +264,27 @@ def checkerboard_split(image, disable_3d_sum=False):
     """Split an image in two, by using a checkerboard pattern."""
     # Make an index chess board structure
     shape = image.shape
-    odd_index = list(np.arange(1, shape[i], 2) for i in range(len(shape)))
-    even_index = list(np.arange(0, shape[i], 2) for i in range(len(shape)))
+    odd_index = [np.arange(1, shape[i], 2) for i in range(len(shape))]
+    even_index = [np.arange(0, shape[i], 2) for i in range(len(shape))]
 
     # Create the two pseudo images
     if image.ndim == 2:
         image1 = image[odd_index[0], :][:, odd_index[1]]
         image2 = image[even_index[0], :][:, even_index[1]]
+    elif disable_3d_sum:
+        image1 = image[odd_index[0], :, :][:, odd_index[1], :][:, :, odd_index[2]]
+        image2 = image[even_index[0], :, :][:, even_index[1], :][:, :, even_index[2]]
+
     else:
-        if disable_3d_sum:
-            image1 = image[odd_index[0], :, :][:, odd_index[1], :][:, :, odd_index[2]]
-            image2 = image[even_index[0], :, :][:, even_index[1], :][:, :, even_index[2]]
+        image1 = (
+            image.astype(np.uint32)[even_index[0], :, :][:, odd_index[1], :][:, :, odd_index[2]]
+            + image.astype(np.uint32)[odd_index[0], :, :][:, odd_index[1], :][:, :, odd_index[2]]
+        )
 
-        else:
-            image1 = (
-                image.astype(np.uint32)[even_index[0], :, :][:, odd_index[1], :][:, :, odd_index[2]]
-                + image.astype(np.uint32)[odd_index[0], :, :][:, odd_index[1], :][:, :, odd_index[2]]
-            )
-
-            image2 = (
-                image.astype(np.uint32)[even_index[0], :, :][:, even_index[1], :][:, :, even_index[2]]
-                + image.astype(np.uint32)[odd_index[0], :, :][:, even_index[1], :][:, :, even_index[2]]
-            )
+        image2 = (
+            image.astype(np.uint32)[even_index[0], :, :][:, even_index[1], :][:, :, even_index[2]]
+            + image.astype(np.uint32)[odd_index[0], :, :][:, even_index[1], :][:, :, even_index[2]]
+        )
 
     return image1, image2
 
@@ -297,27 +293,26 @@ def reverse_checkerboard_split(image, disable_3d_sum=False):
     """Split an image in two, by using a checkerboard pattern."""
     # Make an index chess board structure
     shape = image.shape
-    odd_index = list(np.arange(1, shape[i], 2) for i in range(len(shape)))
-    even_index = list(np.arange(0, shape[i], 2) for i in range(len(shape)))
+    odd_index = [np.arange(1, shape[i], 2) for i in range(len(shape))]
+    even_index = [np.arange(0, shape[i], 2) for i in range(len(shape))]
 
     # Create the two pseudo images
     if image.ndim == 2:
         image1 = image[odd_index[0], :][:, even_index[1]]
         image2 = image[even_index[0], :][:, odd_index[1]]
+    elif disable_3d_sum:
+        image1 = image[odd_index[0], :, :][:, odd_index[1], :][:, :, even_index[2]]
+        image2 = image[even_index[0], :, :][:, even_index[1], :][:, :, odd_index[2]]
+
     else:
-        if disable_3d_sum:
-            image1 = image[odd_index[0], :, :][:, odd_index[1], :][:, :, even_index[2]]
-            image2 = image[even_index[0], :, :][:, even_index[1], :][:, :, odd_index[2]]
+        image1 = (
+            image.astype(np.uint32)[even_index[0], :, :][:, odd_index[1], :][:, :, even_index[2]]
+            + image.astype(np.uint32)[odd_index[0], :, :][:, even_index[1], :][:, :, odd_index[2]]
+        )
 
-        else:
-            image1 = (
-                image.astype(np.uint32)[even_index[0], :, :][:, odd_index[1], :][:, :, even_index[2]]
-                + image.astype(np.uint32)[odd_index[0], :, :][:, even_index[1], :][:, :, odd_index[2]]
-            )
-
-            image2 = (
-                image.astype(np.uint32)[even_index[0], :, :][:, even_index[1], :][:, :, odd_index[2]]
-                + image.astype(np.uint32)[odd_index[0], :, :][:, odd_index[1], :][:, :, even_index[2]]
-            )
+        image2 = (
+            image.astype(np.uint32)[even_index[0], :, :][:, even_index[1], :][:, :, odd_index[2]]
+            + image.astype(np.uint32)[odd_index[0], :, :][:, odd_index[1], :][:, :, even_index[2]]
+        )
 
     return image1, image2
