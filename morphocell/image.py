@@ -26,7 +26,7 @@ class Image:
             assert device in ["CPU", "GPU"]
 
         if device == "GPU" and self.gpu_info["num_gpus"] > 0:
-            self.data = self._to_gpu(images, as_float=as_float)
+            self.data = self._to_gpu(images)
         elif device == "GPU" and self.gpu_info["num_gpus"] == 0:
             print("\n GPU requested, but is not available! Creating Image on CPU.")
             self.data = np.asarray(images)
@@ -34,23 +34,24 @@ class Image:
         else:
             self.data = np.asarray(images)
 
+        if as_float:
+            img_as_float32 = get_image_method(self.data, "skimage.util.img_as_float32")
+            self.data = img_as_float32(self.data)
+
         self.shape = self.data.shape
         self.spacing = tuple(spacing)
         self.filename = filename
         self.device = device
 
-    def _to_gpu(self, data, as_float: bool = True):
+    def _to_gpu(self, data):
         """Move given array to GPU."""
         data = self.gpu_info["cp"].asarray(data)
-        if as_float:
-            img_as_float32 = get_image_method(data, "skimage.util.img_as_float32")
-            data = img_as_float32(data)
         return data
 
-    def to_gpu(self, as_float: bool = True):
+    def to_gpu(self):
         """Move Image data to GPU."""
         if self.gpu_info["num_gpus"] > 0:
-            self.data = self._to_gpu(self.data, as_float=as_float)
+            self.data = self._to_gpu(self.data)
             self.device = "GPU"
         else:
             print("\n GPU requested, but is not available! Creating Image on CPU.")
