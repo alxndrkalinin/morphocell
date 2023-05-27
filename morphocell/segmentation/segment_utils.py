@@ -12,16 +12,36 @@ from ..image_utils import pad_image
 
 
 def downscale_and_filter(image: npt.ArrayLike, downscale_factor: float = 0.5, filter_size: int = 3) -> npt.ArrayLike:
-    """Subsample and filter image prior to segmentiation."""
+    """Subsample and filter image prior to segmentiation.
+
+    Parameters
+    ----------
+    image : npt.ArrayLike
+        Image to be downsampled and filtered.
+    downscale_factor : float, optional
+        Factor by which to downscale the image, by default 0.5.
+    filter_size : int, optional
+        Size of median filter kernel, by default 3.
+
+    Returns
+    -------
+    npt.ArrayLike
+        Filtered and downsampled image.
+    """
     skimage_rescale = get_image_method(image, "skimage.transform.rescale")
     # cuCIM does not yet support rank-based median filter that is faster on integer values
     skimage_median = get_image_method(image, "skimage.filters.median")
-    skimage_cube = get_image_method(image, "skimage.morphology.cube")
+    if image.ndim == 2:
+        skimage_footprint = get_image_method(image, "skimage.morphology.square")
+    elif image.ndim == 3:
+        skimage_footprint = get_image_method(image, "skimage.morphology.cube")
+    else:
+        raise ValueError("Image must be 2D or 3D.")
 
     if downscale_factor < 1.0:
         image = skimage_rescale(image, downscale_factor, order=3, anti_aliasing=True)
 
-    return skimage_median(image, footprint=skimage_cube(filter_size))
+    return skimage_median(image, footprint=skimage_footprint(filter_size))
 
 
 def cleanup_segmentation(
