@@ -27,7 +27,7 @@ def get_gpu_info() -> Dict[str, Any]:
 
 
 def get_device(array) -> str:
-    """Move (or keep) array to CPU."""
+    """Return current image device."""
     try:
         cp = get_gpu_info()["cp"]
         return "GPU" if isinstance(array, cp.ndarray) else "CPU"
