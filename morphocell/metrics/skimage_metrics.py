@@ -3,7 +3,7 @@
 from typing import Optional
 import numpy.typing as npt
 
-from .gpu import get_device, get_image_method
+from ..gpu import get_device, get_image_method
 
 
 def psnr(image_true: npt.ArrayLike, image_test: npt.ArrayLike, data_range: Optional[int] = None):
