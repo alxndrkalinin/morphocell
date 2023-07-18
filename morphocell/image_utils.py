@@ -25,14 +25,14 @@ def image_stats(
     }
 
 
-def rescale_xy(
-    img: npt.ArrayLike,
-    factor: float = 1.0,
-    anti_aliasing=True,
-):
-    """Rescale image in XY."""
-    skimage_rescale = get_image_method(img, "skimage.transform.rescale")
-    return skimage_rescale(img, (1.0, factor, factor), preserve_range=False, anti_aliasing=anti_aliasing)
+def rescale_xy(image: npt.ArrayLike, scale: float = 1.0, anti_aliasing: bool = True, preserve_range: bool = False):
+    """Rescale 2D image or 3D image in XY."""
+    skimage_rescale = get_image_method(image, "skimage.transform.rescale")
+    scale_by = scale if image.ndim == 2 else (1.0, scale, scale)
+    return_dtype = image.dtype if preserve_range else np.float32
+    return skimage_rescale(image, scale_by, preserve_range=preserve_range, anti_aliasing=anti_aliasing).astype(
+        return_dtype
+    )
 
 
 def rescale_isotropic(
@@ -84,22 +84,26 @@ def img_mse(
 def pad_image(
     img: npt.ArrayLike,
     pad_size: Union[int, Sequence[int]],
-    axis: int = 0,
+    axes: Union[int, Sequence[int]] = 0,
     mode: str = "reflect",
     deps: Optional[Dict] = None,
 ):
     """Pad an image."""
     npad = np.asarray([(0, 0)] * img.ndim)
-    npad[axis] = [pad_size] * 2 if isinstance(pad_size, int) else pad_size
+    axes = [axes] if isinstance(axes, int) else axes
+    for ax, i in enumerate(axes):
+        npad[ax] = [pad_size] * 2 if isinstance(pad_size, int) else pad_size
     return np.pad(img, pad_width=npad, mode=mode)
 
 
-def pad_image_to_cube(img: npt.ArrayLike, cube_size: int, mode: str = "reflect"):
+def pad_image_to_cube(img: npt.ArrayLike, cube_size: Optional[int] = None, mode: str = "reflect"):
     """Pad all image axis up to cubic shape."""
+    cube_size = cube_size if cube_size is not None else np.max(img.shape)
+
     for i, dim in enumerate(img.shape):
         if dim < cube_size:
             pad_size = (cube_size - dim) // 2
-            img = pad_image(img, pad_size=pad_size, axis=i, mode=mode)
+            img = pad_image(img, pad_size=pad_size, axes=i, mode=mode)
 
     assert np.all([dim == cube_size for dim in img.shape])
     return img
@@ -110,7 +114,7 @@ def pad_image_to_shape(img: npt.ArrayLike, new_shape: Sequence, mode: str = "con
     for i, dim in enumerate(img.shape):
         if dim < new_shape[i]:
             pad_size = (new_shape[i] - dim) // 2
-            img = pad_image(img, pad_size=pad_size, axis=i, mode=mode)
+            img = pad_image(img, pad_size=pad_size, axes=i, mode=mode)
 
     assert np.all([dim == new_shape[i] for i, dim in enumerate(img.shape)])
     return img
@@ -152,9 +156,12 @@ def crop_br(img: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]):
     return img[:, -crop_h:, -crop_w:]
 
 
-def crop_center(img: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]):
+def crop_center(img: npt.ArrayLike, crop_hw: Optional[Union[int, Tuple[int, int]]] = None):
     """Crop from the center of the image."""
-    crop_h, crop_w = (crop_hw, crop_hw) if isinstance(crop_hw, int) else crop_hw
+    if crop_hw is None:
+        crop_h, crop_w = min(img.shape[1:]), min(img.shape[1:])
+    else:
+        crop_h, crop_w = (crop_hw, crop_hw) if isinstance(crop_hw, int) else crop_hw
 
     center_h = img.shape[1] // 2
     center_w = img.shape[2] // 2

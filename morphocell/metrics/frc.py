@@ -4,10 +4,10 @@ from typing import Union, Sequence, Callable, Dict, Optional, Tuple
 import numpy.typing as npt
 from argparse import Namespace
 
-import miplib.data.iterators.fourier_ring_iterators as iterators
+import miplib.data.iterators.fourier_ring_iterators as frc_iterators
+import miplib.data.iterators.fourier_shell_iterators as fsc_iterators
 from miplib.data.containers.fourier_correlation_data import FourierCorrelationData, FourierCorrelationDataCollection
 import miplib.analysis.resolution.analysis as fsc_analysis
-import miplib.analysis.resolution.fourier_shell_correlation as fsc
 import miplib.ui.cli.miplib_entry_point_options as options
 
 from ..image import Image
@@ -138,7 +138,7 @@ def calculate_single_image_frc(
     assert tuple(image1.spacing) == tuple(image2.spacing)
 
     # Run FRC
-    iterator = iterators.FourierRingIterator(image1.shape, args.d_bin)
+    iterator = frc_iterators.FourierRingIterator(image1.shape, args.d_bin)
     frc_task = FRC(image1.data, image2.data, iterator)
     frc_data[0] = frc_task.execute()
 
@@ -146,7 +146,7 @@ def calculate_single_image_frc(
         # Split and make sure that the images are the same size
         image1, image2 = frc_checkerboard_split(image, reverse=True)
         image1, image2 = pad_images_to_matching_shape(image1, image2)
-        iterator = iterators.FourierRingIterator(image1.shape, args.d_bin)
+        iterator = frc_iterators.FourierRingIterator(image1.shape, args.d_bin)
         frc_task = FRC(image1.data, image2.data, iterator)
 
         frc_data[0].correlation["correlation"] *= 0.5
@@ -185,11 +185,11 @@ def calculate_frc(
         ndarray = getattr(xp, "ndarray")  # avoid mypy complains
         if not isinstance(image, ndarray):
             raise ValueError("FRC: incorrect input, should be 2D Image, Numpy or CuPy array.")
-
         if isinstance(scales, (int, float)):
             scales = [scales, scales]
         image = Image(image, scales)
-    assert image.shape[0] == image.shape[1]
+
+    # assert image.shape[0] == image.shape[1], "FRC: input image should be square."
     assert len(image.spacing) == 2
     verboseprint(f"The image dimensions are {image.shape} and spacing {image.spacing} um.")  # type: ignore[operator]
 
@@ -204,21 +204,38 @@ def calculate_frc(
 
 
 def calculate_fsc(
-    img_cube: npt.ArrayLike,
+    img_cubes: Union[npt.ArrayLike, Image, Tuple[Union[npt.ArrayLike, Image]]],
     bin_delta: int = 10,
     scales: Union[int, float, Sequence] = 1.0,
     z_correction: float = 1.0,
+    zero_padding: bool = True,
+    return_resolution: bool = True,
     verbose: bool = False,
 ):
     """Calculate FSC-based 3D image resolution."""
     verboseprint = print if verbose else lambda *a, **k: None
 
-    if isinstance(scales, (int, float)):
-        scales = [scales, scales, scales]
+    if not isinstance(img_cubes, tuple):
+        img_cubes = (img_cubes,)
 
-    assert img_cube.shape[0] == img_cube.shape[1] == img_cube.shape[2]
-    miplib_img = Image(img_cube, scales)
-    verboseprint(f"The image dimensions are {miplib_img.shape} and spacing {miplib_img.spacing} um.")  # type: ignore[operator]
+    img_cubes_processed = []
+    for img_cube in img_cubes:
+        if not isinstance(img_cube, Image):
+            xp = get_array_module(img_cube)
+            ndarray = getattr(xp, "ndarray")  # avoid mypy complains
+            if not isinstance(img_cube, ndarray):
+                raise ValueError("FSC: incorrect input, should be 3D Image, Numpy or CuPy array.")
+
+        if isinstance(scales, (int, float)):
+            scales = [scales, scales, scales]
+
+        if np.unique(img_cube.shape).size > 1 and zero_padding:
+            img_cube = pad_image_to_cube(img_cube.data) if isinstance(img_cube, Image) else pad_image_to_cube(img_cube)
+
+        assert img_cube.shape[0] == img_cube.shape[1] == img_cube.shape[2], "FSC: image should be a cube."
+        img_cube = Image(img_cube, scales)
+        verboseprint(f"FSC: image dimensions are {img_cube.shape} and spacing {img_cube.spacing} um.")  # type: ignore[operator]
+        img_cubes_processed.append(img_cube)
 
     args_list = [
         None,
@@ -232,7 +249,184 @@ def calculate_fsc(
         "--frc-curve-fit-type=spline",
     ]
     args = options.get_frc_script_options(args_list)
-    return fsc.calculate_one_image_sectioned_fsc(miplib_img, args, z_correction=z_correction)
+
+    if len(img_cubes_processed) == 1:
+        fsc_result = calculate_one_image_sectioned_fsc(img_cubes_processed[0], args, z_correction=z_correction)
+    elif len(img_cubes_processed) == 2:
+        fsc_result = calculate_two_image_sectioned_fsc(
+            img_cubes_processed[0], img_cubes_processed[1], args, z_correction=z_correction
+        )
+    else:
+        raise ValueError("FSC: incorrect number of input images. Should be 1 or 2.")
+
+    if return_resolution:
+        angles = list()
+        radii = list()
+
+        for dataset in fsc_result:
+            angles.append((int(dataset[0])))
+            radii.append(dataset[1].resolution["resolution"])
+
+        return {"xy": radii[0], "z": radii[angles.index(90)]}
+    else:
+        return fsc_result
+
+
+# https://github.com/sakoho81/miplib/blob/public/miplib/analysis/resolution/fourier_shell_correlation.py
+def calculate_one_image_sectioned_fsc(image, args, z_correction=1.0):
+    """Calculate one-image sectioned FSC.
+
+    I assume here that prior to calling the function,
+    the image is going to be in a correct shape, resampled to isotropic spacing and zero padded. If the image
+    dimensions are wrong (not a cube) the function will return an error.
+
+    :param image: a 3D image, with isotropic spacing and cubic shape
+    :type image: Image
+    :param options: options for the FSC calculation
+    :type options: argparse options
+    :param z_correction: correction, for anisotropic sampling. It is the ratio of axial vs. lateral spacing, defaults to 1
+    :type z_correction: float, optional
+    :return: the resolution measurement results organized by rotation angle
+    :rtype: FourierCorrelationDataCollection object
+    """
+    assert isinstance(image, Image)
+    assert all(s == image.shape[0] for s in image.shape)
+
+    image1, image2 = frc_checkerboard_split(image)
+
+    image1 = Image(hamming_window(image1.data), image1.spacing)
+    image2 = Image(hamming_window(image2.data), image2.spacing)
+
+    iterator = fsc_iterators.AxialExcludeSectionedFourierShellIterator(
+        image1.shape, args.d_bin, args.d_angle, args.d_extract_angle
+    )
+    fsc_task = DirectionalFSC(image1.data, image2.data, iterator)
+
+    data = fsc_task.execute()
+
+    analyzer = fsc_analysis.FourierCorrelationAnalysis(data, image1.spacing[0], args)
+    result = analyzer.execute(z_correction=z_correction)
+
+    def func(x, a, b, c, d):
+        return a * np.exp(c * (x - b)) + d
+
+    params = [0.95988146, 0.97979108, 13.90441896, 0.55146136]
+
+    for angle, dataset in result:
+        point = dataset.resolution["resolution-point"][1]
+
+        cut_off_correction = func(point, *params)
+        dataset.resolution["spacing"] /= cut_off_correction
+        dataset.resolution["resolution"] /= cut_off_correction
+
+    return result
+
+
+def calculate_two_image_sectioned_fsc(image1, image2, args, z_correction=1.0):
+    """Calculate two-image sectioned FSC."""
+    assert isinstance(image1, Image)
+    assert isinstance(image2, Image)
+
+    image1 = Image(hamming_window(image1.data), image1.spacing)
+    image2 = Image(hamming_window(image2.data), image2.spacing)
+
+    iterator = fsc_iterators.AxialExcludeSectionedFourierShellIterator(
+        image1.shape, args.d_bin, args.d_angle, args.d_extract_angle
+    )
+    fsc_task = DirectionalFSC(image1.data, image2.data, iterator)
+    data = fsc_task.execute()
+
+    analyzer = fsc_analysis.FourierCorrelationAnalysis(data, image1.spacing[0], args)
+    return analyzer.execute(z_correction=z_correction)
+
+
+class DirectionalFSC(object):
+    """Calculate the directional FSC between two images."""
+
+    def __init__(self, image1, image2, iterator, normalize_power=False):
+        """Initialize the directional FSC."""
+        # assert isinstance(image1, Image)
+        # assert isinstance(image2, Image)
+
+        if image1.ndim != 3 or image1.shape[0] <= 1:
+            raise ValueError("Image must be 3D")
+
+        if image1.shape != image2.shape:
+            raise ValueError("Image dimensions do not match")
+
+        # Create an Iterator
+        self.iterator = iterator
+
+        # FFT transforms of the input images
+        self.fft_image1 = np.fft.fftshift(np.fft.fftn(image1))
+        self.fft_image2 = np.fft.fftshift(np.fft.fftn(image2))
+
+        if normalize_power:
+            pixels = image1.shape[0] ** 3
+            self.fft_image1 /= np.array(pixels * np.mean(image1))
+            self.fft_image2 /= np.array(pixels * np.mean(image2))
+
+        self._result = None
+
+        # self.pixel_size = image1.spacing[0]
+
+    @property
+    def result(self):
+        """Return the FRC results."""
+        if self._result is None:
+            return self.execute()
+        else:
+            return self._result
+
+    def execute(self):
+        """
+        Calculate the FRC.
+
+        :return: Returns the FRC results. They are also saved inside the class.
+                 The return value is just for convenience.
+        """
+        data_structure = FourierCorrelationDataCollection()
+        radii, angles = self.iterator.steps
+        freq_nyq = self.iterator.nyquist
+        shape = (angles.shape[0], radii.shape[0])
+        c1 = np.zeros(shape, dtype=np.float32)
+        c2 = np.zeros(shape, dtype=np.float32)
+        c3 = np.zeros(shape, dtype=np.float32)
+        points = np.zeros(shape, dtype=np.float32)
+
+        # iterate through the sphere and calculate initial values
+        for ind_ring, shell_idx, rotation_idx in self.iterator:
+            subset1 = self.fft_image1[ind_ring]
+            subset2 = self.fft_image2[ind_ring]
+
+            c1[rotation_idx, shell_idx] = np.sum(subset1 * np.conjugate(subset2)).real
+            c2[rotation_idx, shell_idx] = np.sum(np.abs(subset1) ** 2)
+            c3[rotation_idx, shell_idx] = np.sum(np.abs(subset2) ** 2)
+
+            points[rotation_idx, shell_idx] = len(subset1)
+
+        # finish up FRC calculation for every rotation angle and save results to the data structure.
+        for i in range(angles.size):
+            # calculate FRC for every orientation
+            spatial_freq = asnumpy(radii.astype(np.float32) / freq_nyq)
+            c1_i = asnumpy(c1[i])
+            c2_i = asnumpy(c2[i])
+            c3_i = asnumpy(c3[i])
+            n_points = asnumpy(points[i])
+
+            with np.errstate(divide="ignore", invalid="ignore"):
+                frc = np.abs(c1_i) / np.sqrt(c2_i * c3_i)
+                frc[frc == np.inf] = 0.0
+                frc = np.nan_to_num(frc)
+
+            result = FourierCorrelationData()
+            result.correlation["correlation"] = frc
+            result.correlation["frequency"] = spatial_freq
+            result.correlation["points-x-bin"] = n_points
+
+            data_structure[angles[i]] = result
+
+        return data_structure
 
 
 def grid_crop_resolution(
@@ -355,7 +549,7 @@ def five_crop_resolution(
     xy_resolutions = []
     xz_resolutions = []
     for loc in locations:
-        loc_image = loc(image, crop_size)
+        loc_image = loc(image, crop_size)  # type: ignore
 
         max_projection_resolution = calculate_frc(
             max_project(loc_image), bin_delta, scales_xy, return_resolution, verbose

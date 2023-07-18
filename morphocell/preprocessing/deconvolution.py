@@ -128,7 +128,7 @@ def richardson_lucy_flowdec(
     image = image if isinstance(image, np.ndarray) else io.imread(image)
     psf = psf if isinstance(psf, np.ndarray) else io.imread(psf)
 
-    assert image.shape == psf.shape
+    # assert image.shape == psf.shape
     verboseprint(f"Deconvolving image shape {image.shape} with psf shape {psf.shape} for {n_iter} iterations.")  # type: ignore[operator]
 
     if subprocess_cuda:
@@ -158,10 +158,10 @@ def decon_flowdec(
     if isinstance(psf, str):
         psf = io.imread(str(psf))
 
-    assert image.shape == psf.shape
+    # assert image.shape == psf.shape
     padded_img = pad_image(image, pad_size_z, mode="reflect")
     padded_psf = pad_image(psf, pad_size_z, mode="reflect")
-    assert padded_img.shape == padded_psf.shape
+    # assert padded_img.shape == padded_psf.shape
 
     fl_decon_image = richardson_lucy_flowdec(
         padded_img,
