@@ -1,6 +1,6 @@
 """Implements 2D/3D Fourier Ring/Shell Correlation."""
 
-from typing import Union, Sequence, Callable, Dict, Optional, Tuple
+from typing import Union, Sequence, Callable, Dict, Optional, Tuple, Any
 import numpy.typing as npt
 from argparse import Namespace
 
@@ -37,12 +37,12 @@ def _empty_aggregate(*args: npt.ArrayLike, **kwargs) -> npt.ArrayLike:
     return args[0]
 
 
-def frc_checkerboard_split(image: Image, reverse=False):
+def frc_checkerboard_split(image: Image, reverse=False, disable_3d_sum=False):
     """Split image into two by checkerboard pattern."""
     if reverse:
-        image1, image2 = reverse_checkerboard_split(image.data)
+        image1, image2 = reverse_checkerboard_split(image.data, disable_3d_sum=disable_3d_sum)
     else:
-        image1, image2 = checkerboard_split(image.data)
+        image1, image2 = checkerboard_split(image.data, disable_3d_sum=disable_3d_sum)
     image1 = Image(image1, spacing=image.spacing, device=image.device)
     image2 = Image(image2, spacing=image.spacing, device=image.device)
     return image1, image2
@@ -173,7 +173,8 @@ def calculate_single_image_frc(
 def calculate_frc(
     image: Union[npt.ArrayLike, Image],
     bin_delta: int = 1,
-    scales: Union[int, float, Sequence] = 1.0,
+    scales: Union[float, Sequence] = 1.0,
+    resolution_threshold: str = "fixed",
     return_resolution: bool = True,
     verbose: bool = False,
 ) -> Union[Sequence, float]:
@@ -194,7 +195,8 @@ def calculate_frc(
     verboseprint(f"The image dimensions are {image.shape} and spacing {image.spacing} um.")  # type: ignore[operator]
 
     args_list = (
-        f"None --bin-delta={bin_delta} --frc-curve-fit-type=smooth-spline " " --resolution-threshold-criterion=fixed"
+        f"None --bin-delta={bin_delta} --frc-curve-fit-type=smooth-spline "
+        f" --resolution-threshold-criterion={resolution_threshold}"
     ).split()
     args = options.get_frc_script_options(args_list)
     frc_result = calculate_single_image_frc(image, args)
@@ -203,21 +205,19 @@ def calculate_frc(
     return frc_result
 
 
-def calculate_fsc(
-    img_cubes: Union[npt.ArrayLike, Image, Tuple[Union[npt.ArrayLike, Image]]],
-    bin_delta: int = 10,
-    scales: Union[int, float, Sequence] = 1.0,
-    z_correction: float = 1.0,
+def preprocess_img_cubes(
+    img_cubes: Union[npt.ArrayLike, Image, Sequence[Union[npt.ArrayLike, Image]]],
+    scales: Union[float, Sequence] = 1.0,
     zero_padding: bool = True,
-    return_resolution: bool = True,
     verbose: bool = False,
-):
-    """Calculate FSC-based 3D image resolution."""
+) -> Sequence[Image]:
+    """Preprocess input image cubes."""
     verboseprint = print if verbose else lambda *a, **k: None
 
     if not isinstance(img_cubes, tuple):
         img_cubes = (img_cubes,)
 
+    cube_shape = None
     img_cubes_processed = []
     for img_cube in img_cubes:
         if not isinstance(img_cube, Image):
@@ -229,19 +229,34 @@ def calculate_fsc(
         if isinstance(scales, (int, float)):
             scales = [scales, scales, scales]
 
-        if np.unique(img_cube.shape).size > 1 and zero_padding:
+        if len(set(img_cube.shape)) > 1 and zero_padding:
             img_cube = pad_image_to_cube(img_cube.data) if isinstance(img_cube, Image) else pad_image_to_cube(img_cube)
+            assert len(set(img_cube.shape)) == 1, "FSC: image should be a cube."
 
-        assert img_cube.shape[0] == img_cube.shape[1] == img_cube.shape[2], "FSC: image should be a cube."
+        if cube_shape is None:
+            cube_shape = img_cube.shape
+        elif cube_shape != img_cube.shape:
+            raise ValueError("FSC: all input images should have the same shape.")
+
         img_cube = Image(img_cube, scales)
         verboseprint(f"FSC: image dimensions are {img_cube.shape} and spacing {img_cube.spacing} um.")  # type: ignore[operator]
         img_cubes_processed.append(img_cube)
 
+    return img_cubes_processed
+
+
+def calculate_fsc_result(
+    img_cubes_processed: Sequence[Image],
+    bin_delta: int,
+    resolution_threshold: str,
+    z_correction: float,
+    disable_3d_sum: bool,
+) -> Any:
+    """Calculate FSC result based on preprocessed image cubes."""
     args_list = [
         None,
         f"--bin-delta={bin_delta}",
-        "--resolution-threshold-criterion=snr",
-        "--resolution-snr-value=0.5",
+        f"--resolution-threshold-criterion={resolution_threshold}",
         "--angle-delta=15",
         "--enable-hollow-iterator",
         "--extract-angle-delta=.1",
@@ -251,14 +266,19 @@ def calculate_fsc(
     args = options.get_frc_script_options(args_list)
 
     if len(img_cubes_processed) == 1:
-        fsc_result = calculate_one_image_sectioned_fsc(img_cubes_processed[0], args, z_correction=z_correction)
+        return calculate_one_image_sectioned_fsc(
+            img_cubes_processed[0], args, z_correction=z_correction, disable_3d_sum=disable_3d_sum
+        )
     elif len(img_cubes_processed) == 2:
-        fsc_result = calculate_two_image_sectioned_fsc(
+        return calculate_two_image_sectioned_fsc(
             img_cubes_processed[0], img_cubes_processed[1], args, z_correction=z_correction
         )
     else:
         raise ValueError("FSC: incorrect number of input images. Should be 1 or 2.")
 
+
+def extract_resolution(fsc_result: Any, return_resolution: bool) -> Any:
+    """Extract resolution from FSC result."""
     if return_resolution:
         angles = list()
         radii = list()
@@ -272,8 +292,27 @@ def calculate_fsc(
         return fsc_result
 
 
+def calculate_fsc(
+    img_cubes: Union[npt.ArrayLike, Image, Sequence[Union[npt.ArrayLike, Image]]],
+    bin_delta: int = 10,
+    scales: Union[float, Sequence] = 1.0,
+    resolution_threshold: str = "fixed",
+    z_correction: float = 1.0,
+    zero_padding: bool = True,
+    disable_3d_sum: bool = False,
+    return_resolution: bool = True,
+    verbose: bool = False,
+):
+    """Calculate either single- or two-image FSC-based 3D image resolution."""
+    img_cubes_processed = preprocess_img_cubes(img_cubes, scales, zero_padding, verbose)
+    fsc_result = calculate_fsc_result(
+        img_cubes_processed, bin_delta, resolution_threshold, z_correction, disable_3d_sum
+    )
+    return extract_resolution(fsc_result, return_resolution)
+
+
 # https://github.com/sakoho81/miplib/blob/public/miplib/analysis/resolution/fourier_shell_correlation.py
-def calculate_one_image_sectioned_fsc(image, args, z_correction=1.0):
+def calculate_one_image_sectioned_fsc(image, args, z_correction=1.0, disable_3d_sum=False):
     """Calculate one-image sectioned FSC.
 
     I assume here that prior to calling the function,
@@ -292,7 +331,7 @@ def calculate_one_image_sectioned_fsc(image, args, z_correction=1.0):
     assert isinstance(image, Image)
     assert all(s == image.shape[0] for s in image.shape)
 
-    image1, image2 = frc_checkerboard_split(image)
+    image1, image2 = frc_checkerboard_split(image, disable_3d_sum=disable_3d_sum)
 
     image1 = Image(hamming_window(image1.data), image1.spacing)
     image2 = Image(hamming_window(image2.data), image2.spacing)
@@ -470,7 +509,11 @@ def grid_crop_resolution(
 
         loc_image = image.data[:, y1:y2, x1:x2]
         max_projection_resolution = calculate_frc(
-            max_project(loc_image), bin_delta, scales_xy, return_resolution, verbose
+            max_project(loc_image),
+            bin_delta=bin_delta,
+            scales=scales_xy,
+            return_resolution=return_resolution,
+            verbose=verbose,
         )
         max_projection_resolutions.append(max_projection_resolution)
 
@@ -483,10 +526,10 @@ def grid_crop_resolution(
             xy_slice_resolutions.append(
                 calculate_frc(
                     loc_image[slice_idx, :, :],
-                    bin_delta,
-                    scales_xy,
-                    return_resolution,
-                    verbose,
+                    bin_delta=bin_delta,
+                    scales=scales_xy,
+                    return_resolution=return_resolution,
+                    verbose=verbose,
                 )
             )
 
@@ -501,10 +544,10 @@ def grid_crop_resolution(
             xz_slice_resolutions.append(
                 calculate_frc(
                     padded_xz_slice,
-                    bin_delta,
-                    scales_xz,
-                    return_resolution,
-                    verbose,
+                    bin_delta=bin_delta,
+                    scales=scales_xz,
+                    return_resolution=return_resolution,
+                    verbose=verbose,
                 )
             )
 
@@ -552,7 +595,11 @@ def five_crop_resolution(
         loc_image = loc(image, crop_size)  # type: ignore
 
         max_projection_resolution = calculate_frc(
-            max_project(loc_image), bin_delta, scales_xy, return_resolution, verbose
+            max_project(loc_image),
+            bin_delta=bin_delta,
+            scales=scales_xy,
+            return_resolution=return_resolution,
+            verbose=verbose,
         )
         max_projection_resolutions.append(max_projection_resolution)
 
@@ -564,10 +611,10 @@ def five_crop_resolution(
             xy_slice_resolutions.append(
                 calculate_frc(
                     loc_image[slice_idx, :, :],
-                    bin_delta,
-                    scales_xy,
-                    return_resolution,
-                    verbose,
+                    bin_delta=bin_delta,
+                    scales=scales_xy,
+                    return_resolution=return_resolution,
+                    verbose=verbose,
                 )
             )
 
@@ -576,7 +623,13 @@ def five_crop_resolution(
             padded_xz_slice = pad_image(xz_slice, (xz_slice.shape[1] - xz_slice.shape[0]) // 2, 0, pad_mode)
 
             xz_slice_resolutions.append(
-                calculate_frc(padded_xz_slice, bin_delta, scales_xz, return_resolution, verbose)
+                calculate_frc(
+                    padded_xz_slice,
+                    bin_delta=bin_delta,
+                    scales=scales_xz,
+                    return_resolution=return_resolution,
+                    verbose=verbose,
+                )
             )
 
         xy_resolutions.append(xy_slice_resolutions)
