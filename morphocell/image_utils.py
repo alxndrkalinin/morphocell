@@ -96,16 +96,20 @@ def pad_image(
     return np.pad(img, pad_width=npad, mode=mode)
 
 
-def pad_image_to_cube(img: npt.ArrayLike, cube_size: Optional[int] = None, mode: str = "reflect"):
-    """Pad all image axis up to cubic shape."""
+def pad_image_to_cube(
+    img: npt.ArrayLike, cube_size: Optional[int] = None, mode: str = "reflect", axes: Optional[Sequence[int]] = None
+):
+    """Pad all image axes up to cubic shape."""
+    axes = list(range(img.ndim)) if axes is None else axes
     cube_size = cube_size if cube_size is not None else np.max(img.shape)
 
-    for i, dim in enumerate(img.shape):
+    for i in axes:
+        dim = img.shape[i]
         if dim < cube_size:
             pad_size = (cube_size - dim) // 2
             img = pad_image(img, pad_size=pad_size, axes=i, mode=mode)
 
-    assert np.all([dim == cube_size for dim in img.shape])
+    assert np.all([img.shape[i] == cube_size for i in axes])
     return img
 
 
@@ -156,24 +160,33 @@ def crop_br(img: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]):
     return img[:, -crop_h:, -crop_w:]
 
 
-def crop_center(img: npt.ArrayLike, crop_hw: Optional[Union[int, Tuple[int, int]]] = None):
-    """Crop from the center of the image."""
-    if crop_hw is None:
-        crop_h, crop_w = min(img.shape[1:]), min(img.shape[1:])
-    else:
-        crop_h, crop_w = (crop_hw, crop_hw) if isinstance(crop_hw, int) else crop_hw
+def crop_center(
+    img: npt.ArrayLike, crop_size: Optional[Union[int, Sequence[int]]] = None, axes: Optional[Sequence[int]] = None
+):
+    """Crop from the center of the n-dimensional image."""
+    axes = list(range(img.ndim)) if axes is None else axes
 
-    center_h = img.shape[1] // 2
-    center_w = img.shape[2] // 2
-    half_crop_h = crop_h // 2
-    half_crop_w = crop_w // 2
+    if crop_size is None:
+        crop_size = [min(img.shape[axis] for axis in axes)] * len(axes)
+    elif isinstance(crop_size, int):
+        crop_size = [crop_size] * len(axes)
 
-    y_min = center_h - half_crop_h
-    y_max = center_h + half_crop_h + crop_h % 2
-    x_min = center_w - half_crop_w
-    x_max = center_w + half_crop_w + crop_w % 2
+    if len(axes) != len(crop_size):
+        raise ValueError("The length of 'axes' should be the same as 'crop_size'")
 
-    return img[:, y_min:y_max, x_min:x_max]
+    slices = []
+    for axis in range(img.ndim):
+        if axis in axes:
+            idx = axes.index(axis)
+            center = img.shape[axis] // 2
+            half_crop = crop_size[idx] // 2
+            start = center - half_crop
+            end = center + half_crop + crop_size[idx] % 2
+            slices.append(slice(start, end))
+        else:
+            slices.append(slice(None))
+
+    return img[tuple(slices)]
 
 
 def get_random_crop_coords(
