@@ -91,8 +91,8 @@ def pad_image(
     """Pad an image."""
     npad = np.asarray([(0, 0)] * img.ndim)
     axes = [axes] if isinstance(axes, int) else axes
-    for ax, i in enumerate(axes):
-        npad[ax] = [pad_size] * 2 if isinstance(pad_size, int) else pad_size
+    for ax in axes:
+        npad[ax] = [pad_size] * 2 if isinstance(pad_size, int) else [pad_size[ax]] * 2
     return np.pad(img, pad_width=npad, mode=mode)
 
 
@@ -103,12 +103,13 @@ def pad_image_to_cube(
     axes = list(range(img.ndim)) if axes is None else axes
     cube_size = cube_size if cube_size is not None else np.max(img.shape)
 
-    for i in axes:
-        dim = img.shape[i]
+    pad_sizes = [0] * img.ndim
+    for ax in axes:
+        dim = img.shape[ax]
         if dim < cube_size:
-            pad_size = (cube_size - dim) // 2
-            img = pad_image(img, pad_size=pad_size, axes=i, mode=mode)
+            pad_sizes[ax] = int((cube_size - dim) // 2)
 
+    img = pad_image(img, pad_size=pad_sizes, axes=axes, mode=mode)
     assert np.all([img.shape[i] == cube_size for i in axes])
     return img
 
@@ -176,7 +177,7 @@ def crop_center(
 
     slices = []
     for axis in range(img.ndim):
-        if axis in axes:
+        if axis in axes and img.shape[axis] > crop_size[axes.index(axis)]:
             idx = axes.index(axis)
             center = img.shape[axis] // 2
             half_crop = crop_size[idx] // 2
