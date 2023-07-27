@@ -103,13 +103,15 @@ def pad_image_to_cube(
     axes = list(range(img.ndim)) if axes is None else axes
     cube_size = cube_size if cube_size is not None else np.max(img.shape)
 
-    pad_sizes = [0] * img.ndim
+    pad_sizes = [(0, 0)] * img.ndim
     for ax in axes:
         dim = img.shape[ax]
         if dim < cube_size:
-            pad_sizes[ax] = int((cube_size - dim) // 2)
+            pad_before = (cube_size - dim) // 2
+            pad_after = cube_size - dim - pad_before
+            pad_sizes[ax] = (pad_before, pad_after)
 
-    img = pad_image(img, pad_size=pad_sizes, axes=axes, mode=mode)
+    img = np.pad(img, pad_sizes, mode=mode)
     assert np.all([img.shape[i] == cube_size for i in axes])
     return img
 
