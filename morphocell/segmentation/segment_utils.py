@@ -1,5 +1,7 @@
 """Implement pre- and post-processing for segmentation."""
 
+import warnings
+
 from typing import Optional
 import numpy.typing as npt
 
@@ -8,7 +10,7 @@ import numpy as np
 from ._clear_border import clear_border
 
 from ..gpu import get_image_method
-from ..image_utils import pad_image
+from ..image_utils import pad_image, label
 
 
 def downscale_and_filter(image: npt.ArrayLike, downscale_factor: float = 0.5, filter_size: int = 3) -> npt.ArrayLike:
@@ -44,37 +46,59 @@ def downscale_and_filter(image: npt.ArrayLike, downscale_factor: float = 0.5, fi
     return skimage_median(image, footprint=skimage_footprint(filter_size))
 
 
+def check_labeled_binary(image):
+    """
+    Check if the given image is a labeled image.
+
+    Parameters
+    ----------
+    image : ndarray
+        The image to be checked.
+
+    Returns
+    -------
+    None
+    """
+    assert np.issubdtype(image.dtype, np.integer), "Image must be of integer type."
+
+    unique_values = np.unique(image)
+    assert len(unique_values) > 1, "Image is constant."
+    if len(unique_values) == 2:
+        warnings.warn("Only one label was provided in the image.")
+
+
 def cleanup_segmentation(
-    image: npt.ArrayLike,
+    label_image: npt.ArrayLike,
     min_obj_size: Optional[int] = None,
     max_obj_size: Optional[int] = None,
     border_buffer_size: Optional[int] = None,
     max_hole_size: Optional[int] = None,
 ) -> npt.ArrayLike:
     """Clean up segmented image by removing small objects, clearing borders, and closing holes."""
-    label = get_image_method(image, "skimage.measure.label")
+    check_labeled_binary(label_image)
 
     # first 3 transforms preserve labels
     if min_obj_size is not None:
-        remove_small_objects = get_image_method(image, "skimage.morphology.remove_small_objects")
-        image = remove_small_objects(image, min_size=min_obj_size)
+        remove_small_objects = get_image_method(label_image, "skimage.morphology.remove_small_objects")
+        label_image = remove_small_objects(label_image, min_size=min_obj_size)
 
     if max_obj_size is not None:
-        image = remove_large_objects(image, max_size=max_obj_size)
+        label_image = remove_large_objects(label_image, max_size=max_obj_size)
 
     if border_buffer_size is not None:
-        image = clear_xy_borders(image, buffer_size=border_buffer_size)
+        label_image = clear_xy_borders(label_image, buffer_size=border_buffer_size)
 
     # returns boolean array
     if max_hole_size is not None:
-        remove_holes = get_image_method(image, "skimage.morphology.remove_small_holes")
-        image = remove_holes(image, area_threshold=max_hole_size)
+        remove_holes = get_image_method(label_image, "skimage.morphology.remove_small_holes")
+        label_image = remove_holes(label_image, area_threshold=max_hole_size)
 
-    return label(image).astype(np.uint8)
+    return label(label_image).astype(np.uint8)
 
 
 def remove_large_objects(label_image: npt.ArrayLike, max_size: int = 100000) -> npt.ArrayLike:
     """Remove objects with volume above specified threshold."""
+    check_labeled_binary(label_image)
     label_volumes = np.bincount(label_image.ravel())
     too_large = label_volumes > max_size
     too_large_mask = too_large[label_image]
@@ -84,6 +108,7 @@ def remove_large_objects(label_image: npt.ArrayLike, max_size: int = 100000) -> 
 
 def remove_small_objects(label_image: npt.ArrayLike, min_size: int = 500) -> npt.ArrayLike:
     """Remove objects with volume below specified threshold."""
+    check_labeled_binary(label_image)
     remove_small_objects = get_image_method(label_image, "skimage.morphology.remove_small_objects")
     label_image = remove_small_objects(label_image, min_size=min_size)
     return label_image
@@ -91,6 +116,7 @@ def remove_small_objects(label_image: npt.ArrayLike, min_size: int = 500) -> npt
 
 def clear_xy_borders(label_image: npt.ArrayLike, buffer_size: int = 0) -> npt.ArrayLike:
     """Remove masks that touch XY borders."""
+    check_labeled_binary(label_image)
     label_image = pad_image(label_image, (buffer_size + 1, buffer_size + 1), mode="constant")
     label_image = clear_border(label_image, buffer_size=buffer_size)
     return label_image[buffer_size + 1 : -(buffer_size + 1), :, :]
@@ -98,8 +124,10 @@ def clear_xy_borders(label_image: npt.ArrayLike, buffer_size: int = 0) -> npt.Ar
 
 def remove_touching_objects(label_image: npt.ArrayLike, border_value: int = 100) -> npt.ArrayLike:
     """Find labelled masks that overlap and remove from the image."""
+    check_labeled_binary(label_image)
     skimage_binary_dilation = get_image_method(label_image, "skimage.morphology.binary_dilation")
     skimage_cube = get_image_method(label_image, "skimage.morphology.cube")
+
     exclude_masks = []
     for mask_idx in np.unique(label_image)[1:]:
         if mask_idx not in exclude_masks:

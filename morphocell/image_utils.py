@@ -334,3 +334,9 @@ def reverse_checkerboard_split(image, disable_3d_sum=False):
         )
 
     return image1, image2
+
+
+def label(image: npt.ArrayLike, **kwargs) -> npt.ArrayLike:
+    """Label image using skimage.measure.label."""
+    skimage_label = get_image_method(image, "skimage.measure.label")
+    return skimage_label(image, **kwargs)
