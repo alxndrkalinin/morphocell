@@ -145,6 +145,7 @@ def decon_flowdec(
     image: Union[str, npt.ArrayLike],
     psf: Union[str, npt.ArrayLike],
     n_iter: int = 1,
+    pad_psf: bool = False,
     pad_size_z: int = 1,
     start_mode: str = "input",
     observer_fn: Optional[Callable] = None,
@@ -160,7 +161,7 @@ def decon_flowdec(
 
     # assert image.shape == psf.shape
     padded_img = pad_image(image, pad_size_z, mode="reflect")
-    padded_psf = pad_image(psf, pad_size_z, mode="reflect")
+    padded_psf = pad_image(psf, pad_size_z, mode="reflect") if pad_psf else psf
     # assert padded_img.shape == padded_psf.shape
 
     fl_decon_image = richardson_lucy_flowdec(
@@ -174,7 +175,7 @@ def decon_flowdec(
         subprocess_cuda=subprocess_cuda,
     )
 
-    fl_decon_image = fl_decon_image[pad_size_z : psf.shape[0] + pad_size_z, :, :]
+    fl_decon_image = fl_decon_image[pad_size_z : image.shape[0] + pad_size_z, :, :]
 
     return fl_decon_image.astype(np.uint16)
 
