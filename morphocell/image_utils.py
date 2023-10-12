@@ -41,10 +41,14 @@ def rescale_isotropic(
     downscale_xy: bool = False,
     order: int = 3,
     target_z_size: Optional[int] = None,
+    target_z_voxel_size: Optional[float] = None,
     deps: Optional[Dict] = None,
 ) -> npt.ArrayLike:
-    """Rescale image to isotropic voxels with arbitary Z size."""
+    """Rescale image to isotropic voxels with arbitary Z (voxel) size."""
     skimage_rescale = get_image_method(img, "skimage.transform.rescale")
+
+    if target_z_voxel_size is not None:
+        target_z_size = int(round(img.shape[0] * (voxel_sizes[0] / target_z_voxel_size)))
 
     z_size_per_spacing = img.shape[0] * voxel_sizes[0] / np.asarray(voxel_sizes)
     if target_z_size is None:
