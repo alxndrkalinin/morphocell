@@ -117,6 +117,8 @@ def remove_small_objects(label_image: npt.ArrayLike, min_size: int = 500) -> npt
 def clear_xy_borders(label_image: npt.ArrayLike, buffer_size: int = 0) -> npt.ArrayLike:
     """Remove masks that touch XY borders."""
     check_labeled_binary(label_image)
+    if label_image.ndim == 2:
+        return clear_border(label_image, buffer_size=buffer_size)
     label_image = pad_image(label_image, (buffer_size + 1, buffer_size + 1), mode="constant")
     label_image = clear_border(label_image, buffer_size=buffer_size)
     return label_image[buffer_size + 1 : -(buffer_size + 1), :, :]
