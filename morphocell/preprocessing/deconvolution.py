@@ -128,7 +128,7 @@ def richardson_lucy_flowdec(
     image = image if isinstance(image, np.ndarray) else io.imread(image)
     psf = psf if isinstance(psf, np.ndarray) else io.imread(psf)
 
-    assert image.shape == psf.shape
+    # assert image.shape == psf.shape
     verboseprint(f"Deconvolving image shape {image.shape} with psf shape {psf.shape} for {n_iter} iterations.")  # type: ignore[operator]
 
     if subprocess_cuda:
@@ -145,6 +145,7 @@ def decon_flowdec(
     image: Union[str, npt.ArrayLike],
     psf: Union[str, npt.ArrayLike],
     n_iter: int = 1,
+    pad_psf: bool = False,
     pad_size_z: int = 1,
     start_mode: str = "input",
     observer_fn: Optional[Callable] = None,
@@ -158,10 +159,10 @@ def decon_flowdec(
     if isinstance(psf, str):
         psf = io.imread(str(psf))
 
-    assert image.shape == psf.shape
+    # assert image.shape == psf.shape
     padded_img = pad_image(image, pad_size_z, mode="reflect")
-    padded_psf = pad_image(psf, pad_size_z, mode="reflect")
-    assert padded_img.shape == padded_psf.shape
+    padded_psf = pad_image(psf, pad_size_z, mode="reflect") if pad_psf else psf
+    # assert padded_img.shape == padded_psf.shape
 
     fl_decon_image = richardson_lucy_flowdec(
         padded_img,
@@ -174,7 +175,7 @@ def decon_flowdec(
         subprocess_cuda=subprocess_cuda,
     )
 
-    fl_decon_image = fl_decon_image[pad_size_z : psf.shape[0] + pad_size_z, :, :]
+    fl_decon_image = fl_decon_image[pad_size_z : image.shape[0] + pad_size_z, :, :]
 
     return fl_decon_image.astype(np.uint16)
 
@@ -187,7 +188,6 @@ def decon_iter_num_finder(
     metric_kwargs: Optional[Dict[str, Any]] = None,
     max_iter: int = 25,
     pad_size_z: int = 1,
-    scales: Union[int, float, Tuple[int, ...], Tuple[float, ...]] = 1.0,
     verbose: bool = False,
     subprocess_cuda: bool = False,
 ) -> Tuple[int, List[Dict[str, Union[int, float, np.ndarray]]]]:
@@ -214,13 +214,18 @@ def decon_iter_num_finder(
             if thresh_iter == 0:  # threshold not reached
                 prev_image = results[i - 1]["iter_image"]
                 curr_image = restored_image[pad_size_z : prev_image.shape[0] + pad_size_z, :, :].astype(np.uint16)
-                metric_gain = metric_fn(prev_image, curr_image, **metric_kwargs)
-                results.append({"metric_gain": metric_gain, "iter_image": curr_image})
+                metric_result = metric_fn(prev_image, curr_image, **metric_kwargs)
+
+                metric_gain = metric_result[0] if isinstance(metric_result, tuple) else metric_result
+                results.append({"metric_gain": metric_gain, "iter_image": curr_image, "metric_result": metric_result})
                 verboseprint(f"Iteration {i}: improvement {metric_gain:.8f}")
 
                 if (i > 1) and (metric_gain > metric_threshold):  # threshold reached
                     thresh_iter = i
                     metric_gain_total = metric_fn(results[0]["iter_image"], results[-1]["iter_image"], **metric_kwargs)
+                    metric_gain_total = (
+                        metric_gain_total[0] if isinstance(metric_gain_total, tuple) else metric_gain_total
+                    )
 
                     verboseprint(
                         f"\nThreshold {metric_threshold} reached at iteration {i}"
