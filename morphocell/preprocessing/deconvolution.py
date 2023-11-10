@@ -13,11 +13,10 @@ from ..image_utils import pad_image
 from ..gpu import RunAsCUDASubprocess
 
 try:
-    import tensorflow as tf
-
-    _TF_AVAILABLE = True
     from flowdec import data as fd_data
     from flowdec import restoration as fd_restoration
+
+    _TF_AVAILABLE = True
 except ImportError:
     _TF_AVAILABLE = False
     warnings.warn("FlowDec / TensorFlow are not available. FlowDec deconvolution will not work.")

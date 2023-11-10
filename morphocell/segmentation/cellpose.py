@@ -1,9 +1,16 @@
 """Implement 3D image segmentation using Cellpose."""
 
+import warnings
 from typing import Optional, List
 import numpy.typing as npt
 
-from cellpose import models
+try:
+    from cellpose import models
+
+    _CELLPOSE_AVAILABLE = True
+except ImportError:
+    _CELLPOSE_AVAILABLE = False
+    warnings.warn("Cellpose is not available. Cellpose segmentation will not work.")
 
 from .segment_utils import downscale_and_filter, remove_touching_objects, clear_xy_borders, remove_small_objects
 
@@ -34,6 +41,12 @@ def cellpose_segment(
     min_size: int = 500,
 ) -> npt.ArrayLike:
     """Preprocess image, run Cellpose and postprocessing."""
+    if not _CELLPOSE_AVAILABLE:
+        raise ImportError(
+            "Cellpose is required for this function, but not available. "
+            "Try re-installing with `pip install morphocell[cellpose]`."
+        )
+
     image = downscale_and_filter(image, downscale_factor=downscale_factor)
     masks = cellpose_eval(image, model_type=model_type, omni=omni, channels=channels, diameter=diameter, do_3D=do_3D)
     masks = remove_touching_objects(masks, border_value=border_value)
