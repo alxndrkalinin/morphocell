@@ -5,7 +5,7 @@ import numpy.typing as npt
 
 import numpy as np
 
-from .gpu import get_image_method, get_array_module
+from .gpu import get_image_method, get_array_module, asnumpy
 
 # image operations assume ZYX channel order
 
@@ -344,3 +344,25 @@ def label(image: npt.ArrayLike, **kwargs) -> npt.ArrayLike:
     """Label image using skimage.measure.label."""
     skimage_label = get_image_method(image, "skimage.measure.label")
     return skimage_label(image, **kwargs)
+
+
+def select_max_contrast_slices(img, num_slices=128, return_indices=False):
+    """
+    Select num_slices consecutive Z slices with maximum contrast from a 3D volume.
+
+    Parameters:
+        volume (numpy.ndarray): The 3D image volume. Assumes ZYX format.
+        num_slices (int): Number of consecutive slices to select.
+
+    Returns:
+        numpy.ndarray: The selected slices.
+    """
+    assert img.ndim > 2, "Image should have more than 2 dimensions."
+    std_devs = asnumpy(img.std(tuple(range(1, img.ndim))))
+    # calculate rolling sum of standard deviations for num_slices
+    rolling_sum = np.convolve(std_devs, np.ones(num_slices), "valid")
+    max_contrast_idx = np.argmax(rolling_sum)
+    indices = slice(max_contrast_idx, max_contrast_idx + num_slices)
+    if return_indices:
+        return img[indices], indices
+    return img[indices]
