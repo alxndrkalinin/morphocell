@@ -1,7 +1,7 @@
 """Implement 3D image deconvolution using DeconvolutionLab2 or FlowDec."""
 
 import subprocess
-
+import warnings
 import numpy as np
 import numpy.typing as npt
 from typing import Union, Tuple, Optional, Callable, List, Dict, Any
@@ -9,16 +9,29 @@ from pathlib import Path
 
 from skimage import io
 
-from flowdec import data as fd_data
-from flowdec import restoration as fd_restoration
-
 from ..image_utils import pad_image
 from ..gpu import RunAsCUDASubprocess
 
 try:
+    import tensorflow as tf
+    _TF_AVAILABLE = True
+    from flowdec import data as fd_data
+    from flowdec import restoration as fd_restoration
+except ImportError:
+    _TF_AVAILABLE = False
+    warnings.warn("FlowDec / TensorFlow are not available. FlowDec deconvolution will not work.")
+
+try:
     from pyvirtualdisplay import Display
+    _IS_XVBF_AVAILABLE = True
 except Exception:
-    pass
+    _IS_XVBF_AVAILABLE = False
+    warnings.warn("pyvirtualdisplay is not available. DeconcolutionLab2 deconvolution will not work.")
+
+
+def check_tf_available():
+    if not _TF_AVAILABLE:
+        raise ImportError("FlowDec / TensorFlow are required for this function, but not available. Try re-installing with `pip install morphocell[decon]`.")
 
 
 def richardson_lucy_dl2(
@@ -31,6 +44,9 @@ def richardson_lucy_dl2(
 ) -> Union[int, np.ndarray]:
     """Perform GPU-accelerated (optional) Lucy-Richardson deconvolution using DeconvoltuionLab2."""
     verboseprint = print if verbose else lambda *a, **k: None
+
+    if not _IS_XVBF_AVAILABLE:
+        raise ImportError("pyvirtualdisplay is required for this function, but not available. Try re-installing with `pip install morphocell[decon]`.")
 
     tmp_dir = Path(tmp_dir) if tmp_dir is not None else Path.cwd()
     tmp_dir.mkdir(parents=True, exist_ok=True)
@@ -123,6 +139,7 @@ def richardson_lucy_flowdec(
     subprocess_cuda: bool = False,
 ) -> np.ndarray:
     """Perform GPU-accelerated Lucy-Richardson deconvolution using FlowDec (TensorFlow)."""
+    check_tf_available()
     verboseprint = print if verbose else lambda *a, **k: None
 
     image = image if isinstance(image, np.ndarray) else io.imread(image)
@@ -154,6 +171,8 @@ def decon_flowdec(
     subprocess_cuda: bool = False,
 ) -> np.ndarray:
     """Perform FlowDec deconvolution with image padding and rescaling."""
+    check_tf_available()
+
     if isinstance(image, str):
         image = io.imread(str(image))
     if isinstance(psf, str):
@@ -192,6 +211,7 @@ def decon_iter_num_finder(
     subprocess_cuda: bool = False,
 ) -> Tuple[int, List[Dict[str, Union[int, float, np.ndarray]]]]:
     """Find numer of LR decon iterations using image similarity metric."""
+    check_tf_available()
     verboseprint = print if verbose else lambda *a, **k: None
 
     if isinstance(image, str):
