@@ -506,7 +506,6 @@ def grid_crop_resolution(
     xy_resolutions = []
     xz_resolutions = []
     for y1, y2, x1, x2 in locations:
-
         loc_image = image.data[:, y1:y2, x1:x2]
         max_projection_resolution = calculate_frc(
             max_project(loc_image),
@@ -522,7 +521,6 @@ def grid_crop_resolution(
         xz_slices = np.linspace(0, crop_size - 1, num=loc_image.shape[0], dtype=int)
 
         for slice_idx in range(loc_image.shape[0]):
-
             xy_slice_resolutions.append(
                 calculate_frc(
                     loc_image[slice_idx, :, :],
@@ -607,7 +605,6 @@ def five_crop_resolution(
         xz_slice_resolutions = []
         xz_slices = np.linspace(0, crop_size - 1, num=loc_image.shape[0], dtype=int)
         for slice_idx in range(loc_image.shape[0]):
-
             xy_slice_resolutions.append(
                 calculate_frc(
                     loc_image[slice_idx, :, :],

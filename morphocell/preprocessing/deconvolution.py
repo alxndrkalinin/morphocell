@@ -14,6 +14,7 @@ from ..gpu import RunAsCUDASubprocess
 
 try:
     import tensorflow as tf
+
     _TF_AVAILABLE = True
     from flowdec import data as fd_data
     from flowdec import restoration as fd_restoration
@@ -23,6 +24,7 @@ except ImportError:
 
 try:
     from pyvirtualdisplay import Display
+
     _IS_XVBF_AVAILABLE = True
 except Exception:
     _IS_XVBF_AVAILABLE = False
@@ -31,7 +33,10 @@ except Exception:
 
 def check_tf_available():
     if not _TF_AVAILABLE:
-        raise ImportError("FlowDec / TensorFlow are required for this function, but not available. Try re-installing with `pip install morphocell[decon]`.")
+        raise ImportError(
+            "FlowDec / TensorFlow are required for this function, but not available. "
+            "Try re-installing with `pip install morphocell[decon]`."
+        )
 
 
 def richardson_lucy_dl2(
@@ -46,7 +51,10 @@ def richardson_lucy_dl2(
     verboseprint = print if verbose else lambda *a, **k: None
 
     if not _IS_XVBF_AVAILABLE:
-        raise ImportError("pyvirtualdisplay is required for this function, but not available. Try re-installing with `pip install morphocell[decon]`.")
+        raise ImportError(
+            "pyvirtualdisplay is required for this function, but not available. "
+            "Try re-installing with `pip install morphocell[decon]`."
+        )
 
     tmp_dir = Path(tmp_dir) if tmp_dir is not None else Path.cwd()
     tmp_dir.mkdir(parents=True, exist_ok=True)
