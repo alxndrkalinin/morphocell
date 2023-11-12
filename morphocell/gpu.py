@@ -3,6 +3,7 @@ from typing import Callable, Dict, Any
 from types import ModuleType
 
 import os
+import warnings
 import cloudpickle
 import multiprocessing as mp
 
@@ -23,55 +24,53 @@ def get_gpu_info() -> Dict[str, Any]:
     except Exception:
         cp = None
         cucim = None
+        warnings.warn("CuPy or CuCIM is not installed. Falling back to CPU.")
     return {"num_gpus": num_gpus, "cp": cp, "cucim": cucim}
 
 
 def get_device(array) -> str:
     """Return current image device."""
-    try:
-        cp = get_gpu_info()["cp"]
-        return "GPU" if isinstance(array, cp.ndarray) else "CPU"
-    except Exception:
-        return "CPU"
+    cp = get_gpu_info()["cp"]
+    if cp is not None and hasattr(array, "device"):
+        return "GPU"
+    return "CPU"
 
 
 def get_array_module(array) -> ModuleType:
     """Get the NumPy or CuPy method based on argument location."""
     cp = get_gpu_info()["cp"]
-    return cp.get_array_module(array) if cp is not None else np
+    if cp is not None:
+        return cp.get_array_module(array)
+    return np
 
 
 def asnumpy(array):
     """Move (or keep) array to CPU."""
     if isinstance(array, np.ndarray):
         return np.asarray(array)
-    try:
-        cp = get_gpu_info()["cp"]
-        if isinstance(array, cp.ndarray):
-            return cp.asnumpy(array)
-    except Exception:
-        return np.asarray(array)
+
+    cp = get_gpu_info()["cp"]
+    if cp is not None and hasattr(array, "device"):
+        return cp.asnumpy(array)
+
+    return np.asarray(array)
 
 
 def ascupy(array):
     """Move (or keep) array to GPU."""
-    try:
-        cp = get_gpu_info()["cp"]
-        if isinstance(array, np.ndarray):
-            return cp.asarray(array)
-    except Exception:
-        return np.asarray(array)
+    cp = get_gpu_info()["cp"]
+    if cp is not None:
+        return cp.asarray(array)
+    return np.asarray(array)
 
 
 def get_image_method(array, method: str) -> Callable:
     """Return skimage or cucim.skimage method by the argument type/device."""
     module, method = method.rsplit(".", maxsplit=1)
 
-    try:
-        if isinstance(array, get_gpu_info()["cp"].ndarray):
-            module = f"cucim.{module}"
-    except Exception:
-        pass
+    cp = get_gpu_info()["cp"]
+    if cp is not None and hasattr(array, "device"):
+        module = f"cucim.{module}"
 
     return getattr(import_module(module), method)
 

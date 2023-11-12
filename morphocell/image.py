@@ -1,5 +1,5 @@
 """Contains a simple class for storing image data."""
-
+import warning
 from typing import Optional, Sequence
 
 import numpy as np
@@ -25,10 +25,10 @@ class Image:
         else:
             assert device in ["CPU", "GPU"]
 
-        if device == "GPU" and self.gpu_info["num_gpus"] > 0:
+        if device.upper() == "GPU" and self.gpu_info["num_gpus"] > 0:
             self.data = self._to_gpu(images)
-        elif device == "GPU" and self.gpu_info["num_gpus"] == 0:
-            print("\n GPU requested, but is not available! Creating Image on CPU.")
+        elif device.upper() == "GPU" and self.gpu_info["num_gpus"] == 0:
+            warning.warn("GPU requested, but is not available! Creating Image on CPU.")
             self.data = np.asarray(images)
             device = "CPU"
         else:
@@ -54,8 +54,7 @@ class Image:
             self.data = self._to_gpu(self.data)
             self.device = "GPU"
         else:
-            print("\n GPU requested, but is not available! Creating Image on CPU.")
-            raise ImportError
+            raise ImportError("\n GPU requested, but is not available! Creating Image on CPU.")
 
     def to_cpu(self):
         """Move (or keep) Image on CPU."""
