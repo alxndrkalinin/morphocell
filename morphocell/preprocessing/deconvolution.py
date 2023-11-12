@@ -31,6 +31,7 @@ except Exception:
 
 
 def check_tf_available():
+    """Check if TensorFlow is available."""
     if not _TF_AVAILABLE:
         raise ImportError(
             "FlowDec / TensorFlow are required for this function, but not available. "
