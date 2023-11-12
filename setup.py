@@ -12,7 +12,13 @@ LICENSE = "MIT"
 
 INSTALL_REQUIRES = ["numpy>=1.20.0", "scikit-image>=0.16.1"]
 EXTRAS_REQUIRE = {
-    "decon": ["tensorflow-gpu>=1.14.0,<2.2.1", "flowdec[tf_gpu]>=1.1.0", "pyvirtualdisplay>=2.0", "cloudpickle>=2.0"],
+    "decon": [
+        "tensorflow-gpu>=1.14.0,<2.2.1",
+        "flowdec[tf_gpu]>=1.1.0",
+        "pyvirtualdisplay>=2.0",
+        "cloudpickle>=2.0",
+        "py3nvml>=0.2.6",
+    ],
     "frc": ["miplib @ git+https://github.com/alxndrkalinin/miplib@public"],
     "cellpose": ["cellpose>=0.6.0"],
 }
