@@ -4,7 +4,6 @@ from types import ModuleType
 
 import os
 import warnings
-import cloudpickle
 import multiprocessing as mp
 
 from importlib import import_module
@@ -21,7 +20,7 @@ def get_gpu_info() -> Dict[str, Any]:
         import cucim
 
         num_gpus = cp.cuda.runtime.getDeviceCount()
-    except Exception:
+    except ImportError:
         cp = None
         cucim = None
         warnings.warn("CuPy or CuCIM is not installed. Falling back to CPU.")
@@ -91,7 +90,7 @@ class RunAsCUDASubprocess:
             import py3nvml
 
             num_grabbed = py3nvml.grab_gpus(num_gpus, gpu_fraction=memory_fraction)
-        except Exception:
+        except ImportError:
             # either CUDA is not installed on the system or py3nvml is not installed (which probably means the env
             # does not have CUDA-enabled packages). Either way, block the visible devices to be sure.
             num_grabbed = 0
@@ -106,12 +105,16 @@ class RunAsCUDASubprocess:
 
         # using cloudpickle because it is more flexible about what functions it will
         # pickle (lambda functions, notebook code, etc.)
+        import cloudpickle
+
         return cloudpickle.loads(fn)(*args)
 
     def __call__(self, f):
         """Spawn a separate process to run wrapped TensorFlow function."""
 
         def wrapped_f(*args):
+            import cloudpickle
+
             with mp.get_context("spawn").Pool(1) as p:
                 return p.apply(
                     RunAsCUDASubprocess._subprocess_code,
