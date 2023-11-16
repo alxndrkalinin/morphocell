@@ -18,12 +18,20 @@ def get_gpu_info() -> Dict[str, Any]:
     try:
         import cupy as cp
         import cucim
-
-        num_gpus = cp.cuda.runtime.getDeviceCount()
     except ImportError:
         cp = None
         cucim = None
         warnings.warn("CuPy or CuCIM is not installed. Falling back to CPU.")
+
+    try:
+        num_gpus = cp.cuda.runtime.getDeviceCount()
+    except Exception:
+        cp = None
+        cucim = None
+        warnings.warn(
+            "Unable to detect CUDA-compatible GPU at the runtime. Check that driver is installed and GPU is visible. Falling back to CPU."
+        )
+
     return {"num_gpus": num_gpus, "cp": cp, "cucim": cucim}
 
 
