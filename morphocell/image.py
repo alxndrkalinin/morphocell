@@ -1,5 +1,5 @@
 """Contains a simple class for storing image data."""
-import warning
+import warnings
 from typing import Optional, Sequence
 
 import numpy as np
@@ -28,7 +28,7 @@ class Image:
         if device.upper() == "GPU" and self.gpu_info["num_gpus"] > 0:
             self.data = self._to_gpu(images)
         elif device.upper() == "GPU" and self.gpu_info["num_gpus"] == 0:
-            warning.warn("GPU requested, but is not available! Creating Image on CPU.")
+            warnings.warn("GPU requested, but is not available! Creating Image on CPU.")
             self.data = np.asarray(images)
             device = "CPU"
         else:
