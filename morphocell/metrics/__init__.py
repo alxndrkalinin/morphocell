@@ -1,5 +1,6 @@
 """Expose metrics functions."""
 
+from .map import average_precision
 from .skimage_metrics import psnr, ssim
 from .frc import calculate_frc, calculate_fsc, five_crop_resolution, grid_crop_resolution, frc_resolution_difference
 
@@ -8,6 +9,7 @@ __all__ = [
     "ssim",
     "calculate_frc",
     "calculate_fsc",
+    "average_precision",
     "five_crop_resolution",
     "grid_crop_resolution",
     "frc_resolution_difference",
