@@ -6,11 +6,12 @@ from typing import Optional
 import numpy.typing as npt
 
 import numpy as np
+from skimage.segmentation import watershed
 
 from ._clear_border import clear_border
 
-from ..gpu import get_image_method
-from ..image_utils import pad_image, label
+from ..gpu import get_device, to_device, get_image_method
+from ..image_utils import pad_image, label, distance_transform_edt
 
 
 def downscale_and_filter(image: npt.ArrayLike, downscale_factor: float = 0.5, filter_size: int = 3) -> npt.ArrayLike:
@@ -79,6 +80,7 @@ def cleanup_segmentation(
 
     # first 3 transforms preserve labels
     if min_obj_size is not None:
+        # min_obj_size = to_device(min_obj_size, get_device(label_image))
         remove_small_objects = get_image_method(label_image, "skimage.morphology.remove_small_objects")
         label_image = remove_small_objects(label_image, min_size=min_obj_size)
 
@@ -148,3 +150,21 @@ def remove_touching_objects(label_image: npt.ArrayLike, border_value: int = 100)
         label_image[label_image == exclude_mask] = 0
 
     return label_image
+
+
+def segment_watershed(image, ball_size=15):
+    """Segment image using watershed algorithm."""
+    device = get_device(image)
+    skimage_ball = get_image_method(image, "skimage.morphology.ball")
+    skimage_peak_local_max = get_image_method(image, "skimage.feature.peak_local_max")
+
+    distance = distance_transform_edt(image)
+    coords = skimage_peak_local_max(distance, footprint=skimage_ball(ball_size), labels=image).get()
+
+    mask = np.zeros(distance.shape, dtype=bool)
+    mask[tuple(coords.T)] = True
+    markers = label(mask)
+
+    labels = watershed(-distance.get(), markers, mask=image.get())
+    # return in the format and on the same device as input
+    return to_device(labels, device)

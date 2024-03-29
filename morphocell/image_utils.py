@@ -366,3 +366,40 @@ def select_max_contrast_slices(img, num_slices=128, return_indices=False):
     if return_indices:
         return img[indices], indices
     return img[indices]
+
+
+def distance_transform_edt(
+    image,
+    sampling=None,
+    return_distances=True,
+    return_indices=False,
+    distances=None,
+    indices=None,
+    block_params=None,
+    float64_distances=False,
+):
+    """Compute the Euclidean distance transform of a binary image."""
+    if isinstance(image, np.ndarray):
+        if block_params is not None or float64_distances:
+            raise ValueError(
+                "NumPy array found. 'block_params' and 'float64_distances' can only be used with CuPy arrays."
+            )
+        from scipy.ndimage import distance_transform_edt
+
+        return distance_transform_edt(
+            image, sampling=None, return_distances=True, return_indices=False, distances=None, indices=None
+        )
+    else:
+        # cuCIM access interface is different from scipy.ndimage
+        from cucim.core.operations.morphology import distance_transform_edt
+
+        return distance_transform_edt(
+            image,
+            sampling=None,
+            return_distances=True,
+            return_indices=False,
+            distances=None,
+            indices=None,
+            block_params=None,
+            float64_distances=False,
+        )
