@@ -43,6 +43,16 @@ def get_device(array) -> str:
     return "CPU"
 
 
+def to_device(array, device):
+    """Move array to the requested device."""
+    if device == "GPU":
+        return ascupy(array)
+    elif device == "CPU":
+        return asnumpy(array)
+    else:
+        raise ValueError(f"Device should be 'CPU' or 'GPU', unknown requested: {device}.")
+
+
 def get_array_module(array) -> ModuleType:
     """Get the NumPy or CuPy method based on argument location."""
     cp = get_gpu_info()["cp"]
