@@ -10,7 +10,7 @@ from skimage.segmentation import watershed
 
 from ._clear_border import clear_border
 
-from ..gpu import get_device, to_device, get_image_method
+from ..gpu import get_device, to_device, get_image_method, asnumpy
 from ..image_utils import pad_image, label, distance_transform_edt
 
 
@@ -159,12 +159,12 @@ def segment_watershed(image, ball_size=15):
     skimage_peak_local_max = get_image_method(image, "skimage.feature.peak_local_max")
 
     distance = distance_transform_edt(image)
-    coords = skimage_peak_local_max(distance, footprint=skimage_ball(ball_size), labels=image).get()
+    coords = skimage_peak_local_max(distance, footprint=skimage_ball(ball_size), labels=image)
 
     mask = np.zeros(distance.shape, dtype=bool)
-    mask[tuple(coords.T)] = True
+    mask[tuple(asnumpy(coords.T))] = True
     markers = label(mask)
 
-    labels = watershed(-distance.get(), markers, mask=image.get())
+    labels = watershed(-asnumpy(distance), markers, mask=asnumpy(image))
     # return in the format and on the same device as input
     return to_device(labels, device)
