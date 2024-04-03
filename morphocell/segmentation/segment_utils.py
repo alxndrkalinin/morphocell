@@ -152,6 +152,23 @@ def remove_touching_objects(label_image: npt.ArrayLike, border_value: int = 100)
     return label_image
 
 
+def remove_thin_objects(label_image, min_z=2):
+    """Remove objects thinner than a specified minimum value in Z."""
+    unique_labels = [regionlabel for regionlabel in np.unique(label_image) if regionlabel != 0]
+    for regionlabel in unique_labels:
+        mask = label_image == regionlabel
+
+        maskz = np.any(mask, axis=(1, 2))
+        z1 = np.argmax(maskz)
+        z2 = len(maskz) - np.argmax(maskz[::-1])
+        size_z = abs(z2 - z1)
+
+        if size_z <= min_z:
+            label_image[mask] = 0
+
+    return label_image
+
+
 def segment_watershed(image, ball_size=15):
     """Segment image using watershed algorithm."""
     device = get_device(image)
