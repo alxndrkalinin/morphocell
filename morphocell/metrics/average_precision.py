@@ -82,11 +82,15 @@ def average_precision(masks_true, masks_pred, threshold=[0.5, 0.75, 0.9]):
     ap, tp, fp, fn = np.zeros((4, len(masks_true), len(threshold)), np.float32)
     n_true = np.asarray([asnumpy(mt.max()) for mt in masks_true])
     n_pred = np.asarray([asnumpy(mp.max()) for mp in masks_pred])
+    # ious = np.zeros(len(masks_true), np.float32)
+    ious = []
 
     for n in range(len(masks_true)):
         if n_pred[n] > 0:
             iou = _intersection_over_union(masks_true[n], masks_pred[n])
             iou = np.nan_to_num(asnumpy(iou))
+            # ious[n] = iou.mean()
+            ious.append(iou)
             for k, th in enumerate(threshold):
                 tp[n, k] = _true_positive(iou, th)
         fp[n, :] = n_pred[n] - tp[n, :]
@@ -101,4 +105,4 @@ def average_precision(masks_true, masks_pred, threshold=[0.5, 0.75, 0.9]):
     if not_list:
         ap, tp, fp, fn = ap[0], tp[0], fp[0], fn[0]
 
-    return ap, tp, fp, fn
+    return ap, tp, fp, fn, ious
