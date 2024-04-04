@@ -7,6 +7,8 @@ from .segment_utils import (
     remove_small_objects,
     clear_xy_borders,
     cleanup_segmentation,
+    remove_thin_objects,
+    fill_label_holes,
 )
 
 __all__ = [
@@ -16,4 +18,6 @@ __all__ = [
     "remove_small_objects",
     "clear_xy_borders",
     "cleanup_segmentation",
+    "remove_thin_objects",
+    "fill_label_holes",
 ]

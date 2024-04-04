@@ -98,6 +98,53 @@ def cleanup_segmentation(
     return label(label_image).astype(np.uint8)
 
 
+def find_objects(label_image, max_label=None):
+    """
+    Find objects in a labeled nD array.
+
+    Parameters
+    ----------
+    label_image : cupy.ndarray
+        nD array containing objects defined by different labels. Labels with
+        value 0 are ignored.
+    max_label : int, optional
+        Maximum label to be searched for in `input`. If max_label is not
+        specified, the positions of all objects up to the highest label are returned.
+
+    Returns
+    -------
+    object_slices : list of tuples
+        A list of tuples, with each tuple containing N slices (with N the
+        dimension of the input array). Slices correspond to the minimal
+        parallelepiped that contains the object. If a number is missing,
+        None is returned instead of a slice. The label `l` corresponds to
+        the index `l-1` in the returned list.
+    """
+    if max_label is None:
+        max_label = int(np.max(label_image))
+
+    object_slices = [None] * max_label
+
+    for label_idx in range(1, max_label + 1):
+        mask = label_image == label_idx
+        if not mask.any():
+            continue
+
+        slices = []
+        for dim in range(mask.ndim):
+            axis_indices = np.any(mask, axis=tuple(range(mask.ndim))[:dim] + tuple(range(mask.ndim))[dim + 1 :])
+            if not axis_indices.any():
+                slices.append(None)
+                continue
+            min_idx = int(np.where(axis_indices)[0].min())
+            max_idx = int(np.where(axis_indices)[0].max()) + 1
+            slices.append(slice(min_idx, max_idx))
+
+        object_slices[label_idx - 1] = tuple(slices)
+
+    return object_slices
+
+
 def remove_large_objects(label_image: npt.ArrayLike, max_size: int = 100000) -> npt.ArrayLike:
     """Remove objects with volume above specified threshold."""
     check_labeled_binary(label_image)
@@ -185,3 +232,39 @@ def segment_watershed(image, ball_size=15):
     labels = watershed(-asnumpy(distance), markers, mask=asnumpy(image))
     # return in the format and on the same device as input
     return to_device(labels, device)
+
+
+def _binary_fill_holes(image):
+    """Fill holes in binary objects."""
+    if get_device(image) == "GPU":
+        from cupyx.scipy.ndimage import binary_fill_holes
+    elif get_device(image) == "CPU":
+        from scipy.ndimage import binary_fill_holes
+    else:
+        raise ValueError("Unknown device.")
+
+    return binary_fill_holes(image)
+
+
+def fill_label_holes(lbl_img, **binary_fill_holes_kwargs):
+    """Fill small holes in label image."""
+
+    def grow(sl, interior):
+        return tuple(slice(s.start - int(w[0]), s.stop + int(w[1])) for s, w in zip(sl, interior))
+
+    def shrink(interior):
+        return tuple(slice(int(w[0]), (-1 if w[1] else None)) for w in interior)
+
+    objects = find_objects(lbl_img)
+    lbl_img_filled = np.zeros_like(lbl_img)
+
+    for i, sl in enumerate(objects, 1):
+        if sl is None:
+            continue
+        interior = [(s.start > 0, s.stop < sz) for s, sz in zip(sl, lbl_img.shape)]
+        shrink_slice = shrink(interior)
+        grown_mask = lbl_img[grow(sl, interior)] == i
+        mask_filled = _binary_fill_holes(grown_mask, **binary_fill_holes_kwargs)[shrink_slice]
+        lbl_img_filled[sl][mask_filled] = i
+
+    return lbl_img_filled
