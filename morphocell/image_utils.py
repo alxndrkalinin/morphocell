@@ -10,6 +10,17 @@ from .gpu import get_image_method, get_array_module, asnumpy
 # image operations assume ZYX channel order
 
 
+def skimage_util(func_name: str):
+    """Wrap skimage utils."""
+
+    def wrapper(image: npt.ArrayLike) -> npt.ArrayLike:
+        """Return device-specific implementation."""
+        conversion_func = get_image_method(image, f"skimage.{func_name}")
+        return conversion_func(image)
+
+    return wrapper
+
+
 def image_stats(
     img: npt.ArrayLike,
     q: Tuple[float, float] = (0.1, 99.9),
