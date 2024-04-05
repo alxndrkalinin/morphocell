@@ -2,7 +2,7 @@
 
 import warnings
 
-from typing import Optional
+from typing import Optional, Sequence
 import numpy.typing as npt
 
 import numpy as np
@@ -251,7 +251,11 @@ def _binary_fill_holes(image):
 
 
 def fill_label_holes(lbl_img, **binary_fill_holes_kwargs):
-    """Fill small holes in label image."""
+    """
+    Fill small holes in label image.
+
+    Inspired by: https://github.com/stardist/stardist/blob/master/stardist/utils.py
+    """
 
     def grow(sl, interior):
         return tuple(slice(s.start - int(w[0]), s.stop + int(w[1])) for s, w in zip(sl, interior))
@@ -272,3 +276,31 @@ def fill_label_holes(lbl_img, **binary_fill_holes_kwargs):
         lbl_img_filled[sl][mask_filled] = i
 
     return lbl_img_filled
+
+
+def fill_holes_slicer(
+    image: npt.ArrayLike, area_threshold: int = 1000, num_iterations: int = 1, axes: Optional[Sequence[int]] = None
+):
+    """
+    Fill holes in slices of binary or labeled objects.
+
+    Inspired by: https://github.com/True-North-Intelligent-Algorithms/tnia-python/blob/main/tnia/morphology/fill_holes.py
+    """
+    skimage_remove_small_holes = get_image_method(image, "skimage.morphology.remove_small_holes")
+    axes = range(image.ndim) if axes is None else axes
+
+    for label_id in np.unique(image)[1:]:
+        binary = image == label_id
+
+        for _ in range(num_iterations):
+            for axis in axes:
+                slicers = [slice(None)] * image.ndim
+                for i in range(binary.shape[axis]):
+                    slicers[axis] = slice(i, i + 1)
+                    binary_slice = binary[tuple(slicers)].squeeze()
+                    filled_slice = skimage_remove_small_holes(binary_slice, area_threshold)
+                    binary[tuple(slicers)] = filled_slice.reshape(binary_slice.shape)
+
+        image[binary] = label_id
+
+    return image
