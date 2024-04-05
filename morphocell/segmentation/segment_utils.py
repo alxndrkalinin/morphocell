@@ -65,7 +65,7 @@ def check_labeled_binary(image):
     unique_values = np.unique(image)
     assert len(unique_values) > 1, "Image is constant."
     if len(unique_values) == 2:
-        warnings.warn("Only one label was provided in the image.")
+        warnings.warn("Only one label was provided in the image. Make sure to label components first.")
 
 
 def cleanup_segmentation(
@@ -93,7 +93,11 @@ def cleanup_segmentation(
     # returns boolean array
     if max_hole_size is not None:
         remove_holes = get_image_method(label_image, "skimage.morphology.remove_small_holes")
-        label_image = remove_holes(label_image, area_threshold=max_hole_size)
+
+        for label_id in np.unique(label_image)[1:]:
+            mask = label_image == label_id
+            filled_mask = remove_holes(mask, area_threshold=max_hole_size)
+            label_image[filled_mask] = label_id
 
     return label(label_image).astype(np.uint8)
 
@@ -170,7 +174,7 @@ def clear_xy_borders(label_image: npt.ArrayLike, buffer_size: int = 0) -> npt.Ar
         return clear_border(label_image, buffer_size=buffer_size)
     label_image = pad_image(label_image, (buffer_size + 1, buffer_size + 1), mode="constant")
     label_image = clear_border(label_image, buffer_size=buffer_size)
-    return label_image[buffer_size + 1 : -(buffer_size + 1), :, :]
+    return label(label_image[buffer_size + 1 : -(buffer_size + 1), :, :])
 
 
 def remove_touching_objects(label_image: npt.ArrayLike, border_value: int = 100) -> npt.ArrayLike:
