@@ -297,9 +297,11 @@ def fill_holes_slicer(
                 slicers = [slice(None)] * image.ndim
                 for i in range(binary.shape[axis]):
                     slicers[axis] = slice(i, i + 1)
-                    binary_slice = binary[tuple(slicers)].squeeze()
+                    binary_slice = binary[tuple(slicers)]
                     filled_slice = skimage_remove_small_holes(binary_slice, area_threshold)
-                    binary[tuple(slicers)] = filled_slice.reshape(binary_slice.shape)
+                    if filled_slice.shape != binary_slice.shape:
+                        raise ValueError("Shape mismatch between filled_slice and binary_slice")
+                    binary[tuple(slicers)] = filled_slice
 
         image[binary] = label_id
 
