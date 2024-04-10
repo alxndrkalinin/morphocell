@@ -154,36 +154,72 @@ def pad_images_to_matching_shape(image1: npt.ArrayLike, image2: npt.ArrayLike, m
     return image1, image2
 
 
-def crop_tl(img: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]):
-    """Crop left top corner."""
-    crop_h, crop_w = (crop_hw, crop_hw) if isinstance(crop_hw, int) else crop_hw
-    return img[:, :crop_h, :crop_w]
+def crop_tl(
+    img: npt.ArrayLike, crop_size: Union[int, Sequence[int]], axes: Optional[Sequence[int]] = None
+) -> npt.ArrayLike:
+    """Crop from the top-left corner."""
+    return crop_corner(img, crop_size, axes, "tl")
 
 
-def crop_bl(img: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]):
-    """Crop left bottom corner."""
-    crop_h, crop_w = (crop_hw, crop_hw) if isinstance(crop_hw, int) else crop_hw
-    return img[:, -crop_h:, :crop_w]
+def crop_bl(
+    img: npt.ArrayLike, crop_size: Union[int, Sequence[int]], axes: Optional[Sequence[int]] = None
+) -> npt.ArrayLike:
+    """Crop from the bottom-left corner."""
+    return crop_corner(img, crop_size, axes, "bl")
 
 
-def crop_tr(img: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]):
-    """Crop right top corner."""
-    crop_h, crop_w = (crop_hw, crop_hw) if isinstance(crop_hw, int) else crop_hw
-    return img[:, :crop_h, -crop_w:]
+def crop_tr(
+    img: npt.ArrayLike, crop_size: Union[int, Sequence[int]], axes: Optional[Sequence[int]] = None
+) -> npt.ArrayLike:
+    """Crop from the top-right corner."""
+    return crop_corner(img, crop_size, axes, "tr")
 
 
-def crop_br(img: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]):
-    """Crop right bottom corner."""
-    crop_h, crop_w = (crop_hw, crop_hw) if isinstance(crop_hw, int) else crop_hw
-    return img[:, -crop_h:, -crop_w:]
+def crop_br(
+    img: npt.ArrayLike, crop_size: Union[int, Sequence[int]], axes: Optional[Sequence[int]] = None
+) -> npt.ArrayLike:
+    """Crop from the bottom-right corner."""
+    return crop_corner(img, crop_size, axes, "br")
+
+
+def crop_corner(
+    img: npt.ArrayLike, crop_size: Union[int, Sequence[int]], axes: Optional[Sequence[int]] = None, corner: str = "tl"
+) -> npt.ArrayLike:
+    """Crop a corner from the image."""
+    axes = [1, 2] if axes is None else axes
+    crop_size = [crop_size] * len(axes) if isinstance(crop_size, int) else crop_size
+
+    if len(crop_size) != len(axes):
+        raise ValueError("Length of 'crop_sizes' must match the length of 'axes'.")
+
+    slices = [slice(None)] * img.ndim
+
+    for axis, size in zip(axes, crop_size):
+        if axis >= img.ndim:
+            raise ValueError("Axis index out of range for the image dimensions.")
+
+        if "t" in corner or "l" in corner:
+            start = 0
+            end = size if size <= img.shape[axis] else img.shape[axis]
+        else:
+            start = -size if size <= img.shape[axis] else -img.shape[axis]
+            end = None
+
+        if "r" in corner and axis == axes[-1]:
+            slices[axis] = slice(-end if end is not None else None, None)
+        elif "b" in corner and axis == axes[-2]:
+            slices[axis] = slice(-end if end is not None else None, None)
+        else:
+            slices[axis] = slice(start, end)
+
+    return img[tuple(slices)]
 
 
 def crop_center(
-    img: npt.ArrayLike, crop_size: Optional[Union[int, Sequence[int]]] = None, axes: Optional[Sequence[int]] = None
+    img: npt.ArrayLike, crop_size: Optional[Union[int, Sequence[int]]], axes: Optional[Sequence[int]] = None
 ):
     """Crop from the center of the n-dimensional image."""
     axes = list(range(img.ndim)) if axes is None else axes
-
     if crop_size is None:
         crop_size = [min(img.shape[axis] for axis in axes)] * len(axes)
     elif isinstance(crop_size, int):
@@ -237,6 +273,38 @@ def random_crop(
         return (img[y1:y2, x1:x2], (y1, y2, x1, x2))
     else:
         return img[y1:y2, x1:x2]
+
+
+def crop_to_divisor(
+    img: npt.ArrayLike,
+    divisors: Union[int, Sequence[int]],
+    axes: Optional[Sequence[int]] = None,
+    crop_type: str = "center",
+) -> npt.ArrayLike:
+    """Crop image to be divisible by the given divisors along specified axes."""
+    if axes is None:
+        axes = [1, 2]  # default to xy axes in a 3d image
+
+    if isinstance(divisors, int):
+        divisors = [divisors] * len(axes)
+
+    if len(axes) != len(divisors):
+        raise ValueError("Length of 'axes' and 'divisors' must be the same")
+
+    crop_size = [img.shape[axis] - (img.shape[axis] % divisor) for axis, divisor in zip(axes, divisors)]
+
+    if crop_type == "center":
+        return crop_center(img, crop_size=crop_size, axes=axes)
+    elif crop_type == "tl":
+        return crop_tl(img, crop_size)
+    elif crop_type == "bl":
+        return crop_bl(img, crop_size)
+    elif crop_type == "tr":
+        return crop_tr(img, crop_size)
+    elif crop_type == "br":
+        return crop_br(img, crop_size)
+    else:
+        raise ValueError("Invalid crop type specified. Choose from 'center', 'tl', 'bl', 'tr', 'br'.")
 
 
 def get_xy_block_coords(image_shape: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]):
