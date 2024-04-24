@@ -1,5 +1,8 @@
 """Implements device-agnostic average precision metric for segmentation."""
-# Modified from Cellpose with added support for CUDA GPUs by Alexandr Kalinin.
+# Modified from StarDist/Cellpose with added support for CUDA GPUs by Alexandr Kalinin.
+#
+# Copyright (c) 2018-2024, Uwe Schmidt, Martin Weigert
+# https://github.com/stardist/stardist/blob/cc5f412d6bacfa08e138d7c097e98f507df46b51/stardist/matching.py
 # Copyright © 2023 Howard Hughes Medical Institute, Authored by Carsen Stringer and Marius Pachitariu.
 # https://github.com/MouseLand/cellpose/blob/509ffca33737058b0b4e2e96d506514e10620eb3/cellpose/metrics.py
 
@@ -52,53 +55,37 @@ def _intersection_over_union(masks_true, masks_pred):
     n_pixels_pred = overlap.sum(axis=0, keepdims=True)
     n_pixels_true = overlap.sum(axis=1, keepdims=True)
     iou = overlap / (n_pixels_pred + n_pixels_true - overlap)
-    # iou = xp.nan_to_num(iou)  # do outside to avoid using xp
     return iou
 
 
-def _true_positive(iou, th):
-    """Calculate the true positive at threshold th."""
+def _matches_at_threshold(iou, th):
+    """Identify matches based on IoU and threshold."""
     n_min = min(iou.shape[0], iou.shape[1])
+    assert n_min > 0, "No masks to match"
     costs = -(iou >= th).astype(float) - iou / (2 * n_min)
     true_ind, pred_ind = linear_sum_assignment(costs)
     match_ok = iou[true_ind, pred_ind] >= th
-    tp = match_ok.sum()
-    return tp
+    return true_ind[match_ok], pred_ind[match_ok]
 
 
-def average_precision(masks_true, masks_pred, threshold=[0.5, 0.75, 0.9]):
-    """Calculate average precision for masks_true and masks_pred, device agnostic."""
-    not_list = False
-    if not isinstance(masks_true, list):
-        masks_true, masks_pred = [masks_true], [masks_pred]
-        not_list = True
+def compute_matches(mask_true, mask_pred, thresholds, return_iou=False):
+    """Compute and store IoU and matching indices for various thresholds."""
+    iou = _intersection_over_union(mask_true, mask_pred)[1:, 1:]
+    iou = np.nan_to_num(asnumpy(iou))
+    matches = {th: _matches_at_threshold(iou, th) for th in thresholds}
+    return (matches, iou) if return_iou else matches
 
-    if not isinstance(threshold, (list, np.ndarray)):
-        threshold = [threshold]
 
-    if len(masks_true) != len(masks_pred):
-        raise ValueError("masks_true and masks_pred must have the same length")
+def average_precision(masks_true, masks_pred, thresholds, matches_per_threshold=None):
+    """Calculate average precision and other metrics for a single pair of mask images with pre-computed matches."""
+    if matches_per_threshold is None:
+        matches_per_threshold = compute_matches(masks_true, masks_pred, thresholds)
 
-    ap, tp, fp, fn = np.zeros((4, len(masks_true), len(threshold)), np.float32)
-    n_true = np.asarray([asnumpy(mt.max()) for mt in masks_true])
-    n_pred = np.asarray([asnumpy(mp.max()) for mp in masks_pred])
+    tp = np.asarray([len(matches_per_threshold[th][0]) for th in thresholds])
+    fp = asnumpy(masks_pred.max()) - tp
+    fn = asnumpy(masks_true.max()) - tp
 
-    for n in range(len(masks_true)):
-        if n_pred[n] > 0:
-            iou = _intersection_over_union(masks_true[n], masks_pred[n])[1:, 1:]
-            iou = np.nan_to_num(asnumpy(iou))
-            for k, th in enumerate(threshold):
-                tp[n, k] = _true_positive(iou, th)
-        fp[n, :] = n_pred[n] - tp[n, :]
-        fn[n, :] = n_true[n] - tp[n, :]
-        ap[n, :] = np.divide(
-            tp[n, :],
-            tp[n, :] + fp[n, :] + fn[n, :],
-            out=np.zeros_like(tp[n, :]),
-            where=tp[n, :] + fp[n, :] + fn[n, :] != 0,
-        )
-
-    if not_list:
-        ap, tp, fp, fn = ap[0], tp[0], fp[0], fn[0]
+    sum_counts = tp + fp + fn
+    ap = np.where(sum_counts > 0, tp / sum_counts, 0)
 
     return ap, tp, fp, fn
