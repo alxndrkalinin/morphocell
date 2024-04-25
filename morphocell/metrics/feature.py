@@ -1,7 +1,12 @@
-"""Calculate feature-based metrics for morphology comparison."""
+"""Calculate feature-based metrics for morphology comparison.
+
+Only matching currently supports GPU, regionprops are forced to execute CPU, see:
+https://github.com/rapidsai/cucim/issues/241
+"""
 
 import numpy as np
 
+from ..gpu import asnumpy
 from .average_precision import compute_matches
 from ..feature.voxel_morphometry import regionprops_table
 
@@ -25,8 +30,8 @@ def _calculate_cosine(true_features, pred_features):
 
 def cosine_median(label_true, label_pred, features, thresholds=None, matches_per_threshold=None, min_max_ranges=None):
     """Calculate cosine distance between median features of true and pred masks."""
-    true_props = regionprops_table(label_true, properties=features)
-    pred_props = regionprops_table(label_pred, properties=features)
+    true_props = regionprops_table(asnumpy(label_true), properties=features)
+    pred_props = regionprops_table(asnumpy(label_pred), properties=features)
     features = [feat for feat in features if feat != "label"]
     true_features = np.column_stack([true_props[feat] for feat in features])
     pred_features = np.column_stack([pred_props[feat] for feat in features])
@@ -52,10 +57,10 @@ def cosine_median(label_true, label_pred, features, thresholds=None, matches_per
     return distances
 
 
-def calculate_morphology_correlations(masks_true, masks_pred, features, thresholds, matches_per_threshold):
+def morphology_correlations(masks_true, masks_pred, features, thresholds, matches_per_threshold):
     """Calculate morphology correlations for matched masks using precomputed matches."""
-    true_props = regionprops_table(masks_true, properties=features)
-    pred_props = regionprops_table(masks_pred, properties=features)
+    true_props = regionprops_table(asnumpy(masks_true), properties=features)
+    pred_props = regionprops_table(asnumpy(masks_pred), properties=features)
     features = [feat for feat in features if feat != "label"]
 
     correlations = {}

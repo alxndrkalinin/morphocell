@@ -1,4 +1,8 @@
-"""Implement extraction of 3D voxel-based morphological features."""
+"""Implement extraction of 3D voxel-based morphological features.
+
+Executing regionprops on GPU currently does not provide performance gains, see:
+https://github.com/rapidsai/cucim/issues/241
+"""
 
 from typing import List, Tuple, Optional
 import numpy.typing as npt
