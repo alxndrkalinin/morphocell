@@ -53,6 +53,12 @@ def to_device(array, device):
         raise ValueError(f"Device should be 'CPU' or 'GPU', unknown requested: {device}.")
 
 
+def to_same_device(source_array, reference_array):
+    """Move the source_array to the same device as reference_array."""
+    target_device = get_device(reference_array)
+    return to_device(source_array, target_device)
+
+
 def get_array_module(array) -> ModuleType:
     """Get the NumPy or CuPy method based on argument location."""
     cp = get_gpu_info()["cp"]
