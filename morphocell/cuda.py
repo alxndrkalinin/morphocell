@@ -1,43 +1,56 @@
 """Contains a class for accessing GPU-accelerated libraries."""
-from typing import Callable, Dict, Any
 from types import ModuleType
 
-import os
 import warnings
-import multiprocessing as mp
-
-from importlib import import_module
+import os
 
 import numpy as np
 
 
-def get_gpu_info() -> Dict[str, Any]:
-    """Provide number of available GPUs and GPU libraries (CuPy, CuCIM)."""
-    num_gpus = 0
+class GPUManager:
+    """Manages GPU resources and libraries."""
 
-    try:
-        import cupy as cp
-        import cucim
-    except ImportError:
-        cp = None
-        cucim = None
-        warnings.warn("CuPy or CuCIM is not installed. Falling back to CPU.")
+    _instance = None
 
-    try:
-        num_gpus = cp.cuda.runtime.getDeviceCount()
-    except Exception:
-        cp = None
-        cucim = None
-        warnings.warn(
-            "Unable to detect CUDA-compatible GPU at the runtime. Check that driver is installed and GPU is visible. Falling back to CPU."
-        )
+    def __new__(cls):
+        """Singleton pattern to ensure only one instance of GPUManager is created."""
+        if cls._instance is None:
+            cls._instance = super(GPUManager, cls).__new__(cls)
+            cls._instance.init_gpu()
+        return cls._instance
 
-    return {"num_gpus": num_gpus, "cp": cp, "cucim": cucim}
+    def init_gpu(self):
+        """Initialize GPU resources."""
+        try:
+            import cupy as cp
+            import cucim
+
+            self.cp = cp
+            self.cucim = cucim
+            self.num_gpus = cp.cuda.runtime.getDeviceCount()
+        except ImportError:
+            self.cp = self.cucim = None
+            self.num_gpus = 0
+            warnings.warn("CuPy or CuCIM is not installed. Falling back to CPU.")
+        except Exception:
+            self.cp = self.cucim = None
+            self.num_gpus = 0
+            warnings.warn(
+                "Unable to detect CUDA-compatible GPU at the runtime. Check that driver is installed and GPU is visible. Falling back to CPU."
+            )
+
+    def get_cp(self):
+        """Return CuPy if available."""
+        return self.cp
+
+    def get_num_gpus(self):
+        """Return number of available GPUs."""
+        return self.num_gpus
 
 
 def get_device(array) -> str:
     """Return current image device."""
-    cp = get_gpu_info()["cp"]
+    cp = GPUManager().get_cp()
     if cp is not None and hasattr(array, "device"):
         return "GPU"
     return "CPU"
@@ -45,10 +58,14 @@ def get_device(array) -> str:
 
 def to_device(array, device):
     """Move array to the requested device."""
+    cp = GPUManager().get_cp()
     if device == "GPU":
-        return ascupy(array)
+        if cp is not None:
+            return cp.asarray(array)
+        else:
+            raise RuntimeError("GPU requested but not available.")
     elif device == "CPU":
-        return asnumpy(array)
+        return np.asarray(array)
     else:
         raise ValueError(f"Device should be 'CPU' or 'GPU', unknown requested: {device}.")
 
@@ -61,7 +78,7 @@ def to_same_device(source_array, reference_array):
 
 def get_array_module(array) -> ModuleType:
     """Get the NumPy or CuPy method based on argument location."""
-    cp = get_gpu_info()["cp"]
+    cp = GPUManager().get_cp()
     if cp is not None:
         return cp.get_array_module(array)
     return np
@@ -69,33 +86,20 @@ def get_array_module(array) -> ModuleType:
 
 def asnumpy(array):
     """Move (or keep) array to CPU."""
+    cp = GPUManager().get_cp()
     if isinstance(array, np.ndarray):
         return np.asarray(array)
-
-    cp = get_gpu_info()["cp"]
-    if cp is not None and hasattr(array, "device"):
+    elif cp is not None and hasattr(array, "device"):
         return cp.asnumpy(array)
-
     return np.asarray(array)
 
 
 def ascupy(array):
     """Move (or keep) array to GPU."""
-    cp = get_gpu_info()["cp"]
+    cp = GPUManager().get_cp()
     if cp is not None:
         return cp.asarray(array)
-    return np.asarray(array)
-
-
-def get_image_method(array, method: str) -> Callable:
-    """Return skimage or cucim.skimage method by the argument type/device."""
-    module, method = method.rsplit(".", maxsplit=1)
-
-    cp = get_gpu_info()["cp"]
-    if cp is not None and hasattr(array, "device"):
-        module = f"cucim.{module}"
-
-    return getattr(import_module(module), method)
+    raise RuntimeError("GPU requested but not available.")
 
 
 class RunAsCUDASubprocess:
@@ -137,7 +141,9 @@ class RunAsCUDASubprocess:
         """Spawn a separate process to run wrapped TensorFlow function."""
 
         def wrapped_f(*args):
+            """Wrap the function to run in a separate process."""
             import cloudpickle
+            import multiprocessing as mp
 
             with mp.get_context("spawn").Pool(1) as p:
                 return p.apply(

@@ -10,8 +10,9 @@ from skimage.segmentation import watershed
 
 from ._clear_border import clear_border
 
-from ..gpu import get_device, to_device, get_image_method, asnumpy
+from ..cuda import get_device, to_device, asnumpy
 from ..image_utils import pad_image, label, distance_transform_edt
+from ..skimage import transform, filters, morphology, feature
 
 
 def downscale_and_filter(image: npt.ArrayLike, downscale_factor: float = 0.5, filter_size: int = 3) -> npt.ArrayLike:
@@ -31,20 +32,18 @@ def downscale_and_filter(image: npt.ArrayLike, downscale_factor: float = 0.5, fi
     npt.ArrayLike
         Filtered and downsampled image.
     """
-    skimage_rescale = get_image_method(image, "skimage.transform.rescale")
     # cuCIM does not yet support rank-based median filter that is faster on integer values
-    skimage_median = get_image_method(image, "skimage.filters.median")
     if image.ndim == 2:
-        skimage_footprint = get_image_method(image, "skimage.morphology.square")
+        skimage_footprint = morphology.square
     elif image.ndim == 3:
-        skimage_footprint = get_image_method(image, "skimage.morphology.cube")
+        skimage_footprint = morphology.cube
     else:
         raise ValueError("Image must be 2D or 3D.")
 
     if downscale_factor < 1.0:
-        image = skimage_rescale(image, downscale_factor, order=3, anti_aliasing=True)
+        image = transform.rescale(image, downscale_factor, order=3, anti_aliasing=True)
 
-    return skimage_median(image, footprint=skimage_footprint(filter_size))
+    return filters.median(image, footprint=skimage_footprint(filter_size))
 
 
 def check_labeled_binary(image):
@@ -81,8 +80,7 @@ def cleanup_segmentation(
     # first 3 transforms preserve labels
     if min_obj_size is not None:
         # min_obj_size = to_device(min_obj_size, get_device(label_image))
-        remove_small_objects = get_image_method(label_image, "skimage.morphology.remove_small_objects")
-        label_image = remove_small_objects(label_image, min_size=min_obj_size)
+        label_image = morphology.remove_small_objects(label_image, min_size=min_obj_size)
 
     if max_obj_size is not None:
         label_image = remove_large_objects(label_image, max_size=max_obj_size)
@@ -92,11 +90,9 @@ def cleanup_segmentation(
 
     # returns boolean array
     if max_hole_size is not None:
-        remove_holes = get_image_method(label_image, "skimage.morphology.remove_small_holes")
-
         for label_id in np.unique(label_image)[1:]:
             mask = label_image == label_id
-            filled_mask = remove_holes(mask, area_threshold=max_hole_size)
+            filled_mask = morphology.remove_small_holes(mask, area_threshold=max_hole_size)
             label_image[filled_mask] = label_id
 
     return label(label_image).astype(np.uint8)
@@ -162,8 +158,7 @@ def remove_large_objects(label_image: npt.ArrayLike, max_size: int = 100000) -> 
 def remove_small_objects(label_image: npt.ArrayLike, min_size: int = 500) -> npt.ArrayLike:
     """Remove objects with volume below specified threshold."""
     check_labeled_binary(label_image)
-    remove_small_objects = get_image_method(label_image, "skimage.morphology.remove_small_objects")
-    label_image = remove_small_objects(label_image, min_size=min_size)
+    label_image = morphology.remove_small_objects(label_image, min_size=min_size)
     return label_image
 
 
@@ -180,14 +175,12 @@ def clear_xy_borders(label_image: npt.ArrayLike, buffer_size: int = 0) -> npt.Ar
 def remove_touching_objects(label_image: npt.ArrayLike, border_value: int = 100) -> npt.ArrayLike:
     """Find labelled masks that overlap and remove from the image."""
     check_labeled_binary(label_image)
-    skimage_binary_dilation = get_image_method(label_image, "skimage.morphology.binary_dilation")
-    skimage_cube = get_image_method(label_image, "skimage.morphology.cube")
 
     exclude_masks = []
     for mask_idx in np.unique(label_image)[1:]:
         if mask_idx not in exclude_masks:
             binary_mask = label_image == mask_idx
-            dilated_mask = skimage_binary_dilation(binary_mask, skimage_cube(3))
+            dilated_mask = morphology.binary_dilation(binary_mask, morphology.cube(3))
             mask_outline = dilated_mask & ~binary_mask
 
             masks_copy = label_image.copy()
@@ -223,11 +216,9 @@ def remove_thin_objects(label_image, min_z=2):
 def segment_watershed(image, ball_size=15):
     """Segment image using watershed algorithm."""
     device = get_device(image)
-    skimage_ball = get_image_method(image, "skimage.morphology.ball")
-    skimage_peak_local_max = get_image_method(image, "skimage.feature.peak_local_max")
 
     distance = distance_transform_edt(image)
-    coords = skimage_peak_local_max(distance, footprint=skimage_ball(ball_size), labels=image)
+    coords = feature.peak_local_max(distance, footprint=morphology.ball(ball_size), labels=image)
 
     mask = np.zeros(distance.shape, dtype=bool)
     mask[tuple(asnumpy(coords.T))] = True
@@ -286,7 +277,6 @@ def fill_holes_slicer(
 
     Inspired by: https://github.com/True-North-Intelligent-Algorithms/tnia-python/blob/main/tnia/morphology/fill_holes.py
     """
-    skimage_remove_small_holes = get_image_method(image, "skimage.morphology.remove_small_holes")
     axes = range(image.ndim) if axes is None else axes
 
     for label_id in np.unique(image)[1:]:
@@ -298,7 +288,7 @@ def fill_holes_slicer(
                 for i in range(binary.shape[axis]):
                     slicers[axis] = slice(i, i + 1)
                     binary_slice = binary[tuple(slicers)]
-                    filled_slice = skimage_remove_small_holes(binary_slice, area_threshold)
+                    filled_slice = morphology.remove_small_holes(binary_slice, area_threshold)
                     if filled_slice.shape != binary_slice.shape:
                         raise ValueError("Shape mismatch between filled_slice and binary_slice")
                     binary[tuple(slicers)] = filled_slice

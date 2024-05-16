@@ -12,7 +12,7 @@ https://github.com/MouseLand/cellpose/blob/509ffca33737058b0b4e2e96d506514e10620
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
-from ..gpu import get_device, asnumpy, ascupy
+from ..cuda import get_device, asnumpy, ascupy
 
 
 def _label_overlap_cpu(x, y):
