@@ -3,7 +3,7 @@ from importlib import import_module
 from types import ModuleType
 from functools import wraps
 
-from .cuda import GPUManager
+from .cuda import CUDAManager
 
 
 class SkimageProxy(ModuleType):
@@ -14,7 +14,7 @@ class SkimageProxy(ModuleType):
     def __init__(self, name):
         """Initialize the proxy module."""
         super().__init__(name)
-        self.gpu_manager = GPUManager()
+        self.cp = CUDAManager().get_cp()
 
     def __getattr__(self, func_name):
         """Dynamically wrap skimage or cucim.skimage functions based on device capability."""
@@ -26,7 +26,7 @@ class SkimageProxy(ModuleType):
             array = args[0]
             base_module = "skimage"
 
-            if self.gpu_manager.get_cp() is not None and hasattr(array, "device"):
+            if self.cp is not None and hasattr(array, "device"):
                 base_module = "cucim.skimage"
 
             full_func_name = f"{base_module}.{self.__name__}.{func_name}"
@@ -53,5 +53,5 @@ class SkimageProxy(ModuleType):
 
 
 def __getattr__(name):
-    """Load the module if not already loaded."""
+    """Load skimage proxy module."""
     return SkimageProxy.load_module(name)

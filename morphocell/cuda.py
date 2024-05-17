@@ -1,4 +1,4 @@
-"""Contains a class for accessing GPU-accelerated libraries."""
+"""Contains a class for accessing CUDA-accelerated libraries."""
 from types import ModuleType
 
 import warnings
@@ -7,15 +7,15 @@ import os
 import numpy as np
 
 
-class GPUManager:
-    """Manages GPU resources and libraries."""
+class CUDAManager:
+    """Manages CUDA resources."""
 
     _instance = None
 
     def __new__(cls):
-        """Singleton pattern to ensure only one instance of GPUManager is created."""
+        """Ensure only one instance of CUDAManager is created."""
         if cls._instance is None:
-            cls._instance = super(GPUManager, cls).__new__(cls)
+            cls._instance = super(CUDAManager, cls).__new__(cls)
             cls._instance.init_gpu()
         return cls._instance
 
@@ -50,7 +50,7 @@ class GPUManager:
 
 def get_device(array) -> str:
     """Return current image device."""
-    cp = GPUManager().get_cp()
+    cp = CUDAManager().get_cp()
     if cp is not None and hasattr(array, "device"):
         return "GPU"
     return "CPU"
@@ -58,7 +58,7 @@ def get_device(array) -> str:
 
 def to_device(array, device):
     """Move array to the requested device."""
-    cp = GPUManager().get_cp()
+    cp = CUDAManager().get_cp()
     if device == "GPU":
         if cp is not None:
             return cp.asarray(array)
@@ -78,7 +78,7 @@ def to_same_device(source_array, reference_array):
 
 def get_array_module(array) -> ModuleType:
     """Get the NumPy or CuPy method based on argument location."""
-    cp = GPUManager().get_cp()
+    cp = CUDAManager().get_cp()
     if cp is not None:
         return cp.get_array_module(array)
     return np
@@ -86,7 +86,7 @@ def get_array_module(array) -> ModuleType:
 
 def asnumpy(array):
     """Move (or keep) array to CPU."""
-    cp = GPUManager().get_cp()
+    cp = CUDAManager().get_cp()
     if isinstance(array, np.ndarray):
         return np.asarray(array)
     elif cp is not None and hasattr(array, "device"):
@@ -96,7 +96,7 @@ def asnumpy(array):
 
 def ascupy(array):
     """Move (or keep) array to GPU."""
-    cp = GPUManager().get_cp()
+    cp = CUDAManager().get_cp()
     if cp is not None:
         return cp.asarray(array)
     raise RuntimeError("GPU requested but not available.")
