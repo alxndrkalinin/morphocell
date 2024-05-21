@@ -77,6 +77,9 @@ def _label_overlap(x, y):
     if device_x != device_y:
         raise ValueError("x and y should be on the same device.")
 
+    if x.shape != y.shape:
+        raise ValueError(f"x and y should have the same shape. Got {x.shape} and {y.shape} instead.")
+
     if device_x == "GPU":
         return _label_overlap_gpu(x, y)
     else:
