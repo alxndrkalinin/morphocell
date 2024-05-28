@@ -40,7 +40,7 @@ def ssim(
     channel_axis: Optional[int] = None,
     gaussian_weights: Optional[bool] = False,
     full: Optional[bool] = False,
-    **kwargs
+    **kwargs,
 ):
     """Compute the mean structural similarity index between two images."""
     assert get_device(im1) == get_device(im2), "Images must be on same device."
