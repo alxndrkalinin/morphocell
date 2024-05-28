@@ -5,20 +5,21 @@ import numpy.typing as npt
 
 import numpy as np
 
-from .gpu import get_image_method, get_array_module, asnumpy
+from .cuda import get_array_module, asnumpy
+from .skimage import transform, exposure, measure
 
 # image operations assume ZYX channel order
 
 
-def skimage_util(func_name: str):
-    """Wrap skimage utils."""
+# def skimage_func(func_name: str):
+#     """Wrap skimage functions to return device-specific implementation."""
 
-    def wrapper(image: npt.ArrayLike) -> npt.ArrayLike:
-        """Return device-specific implementation."""
-        conversion_func = get_image_method(image, f"skimage.{func_name}")
-        return conversion_func(image)
+#     def wrapper(*args, **kwargs) -> npt.ArrayLike:
+#         """Return device-specific implementation."""
+#         conversion_func = get_image_method(args[0], f"skimage.{func_name}")
+#         return conversion_func(*args, **kwargs)
 
-    return wrapper
+#     return wrapper
 
 
 def image_stats(
@@ -38,10 +39,9 @@ def image_stats(
 
 def rescale_xy(image: npt.ArrayLike, scale: float = 1.0, anti_aliasing: bool = True, preserve_range: bool = False):
     """Rescale 2D image or 3D image in XY."""
-    skimage_rescale = get_image_method(image, "skimage.transform.rescale")
     scale_by = scale if image.ndim == 2 else (1.0, scale, scale)
     return_dtype = image.dtype if preserve_range else np.float32
-    return skimage_rescale(image, scale_by, preserve_range=preserve_range, anti_aliasing=anti_aliasing).astype(
+    return transform.rescale(image, scale_by, preserve_range=preserve_range, anti_aliasing=anti_aliasing).astype(
         return_dtype
     )
 
@@ -56,8 +56,6 @@ def rescale_isotropic(
     deps: Optional[Dict] = None,
 ) -> npt.ArrayLike:
     """Rescale image to isotropic voxels with arbitary Z (voxel) size."""
-    skimage_rescale = get_image_method(img, "skimage.transform.rescale")
-
     if target_z_voxel_size is not None:
         target_z_size = int(round(img.shape[0] * (voxel_sizes[0] / target_z_voxel_size)))
 
@@ -65,7 +63,7 @@ def rescale_isotropic(
     if target_z_size is None:
         target_z_size = img.shape[0] if downscale_xy else np.round(z_size_per_spacing[1])
     factors = target_z_size / z_size_per_spacing
-    return skimage_rescale(img, factors, order=order, preserve_range=True, anti_aliasing=downscale_xy)
+    return transform.rescale(img, factors, order=order, preserve_range=True, anti_aliasing=downscale_xy)
 
 
 def normalize_min_max(
@@ -74,9 +72,8 @@ def normalize_min_max(
     deps: Optional[Dict] = None,
 ):
     """Normalize image intensities between percentiles."""
-    skimage_rescale_intensity = get_image_method(img, "skimage.exposure.rescale_intensity")
     vmin, vmax = np.percentile(img, q=q)
-    return skimage_rescale_intensity(img, in_range=(vmin, vmax), out_range=np.float32)
+    return exposure.rescale_intensity(img, in_range=(vmin, vmax), out_range=np.float32)
 
 
 def max_project(
@@ -421,8 +418,7 @@ def reverse_checkerboard_split(image, disable_3d_sum=False):
 
 def label(image: npt.ArrayLike, **kwargs) -> npt.ArrayLike:
     """Label image using skimage.measure.label."""
-    skimage_label = get_image_method(image, "skimage.measure.label")
-    return skimage_label(image, **kwargs)
+    return measure.label(image, **kwargs)
 
 
 def select_max_contrast_slices(img, num_slices=128, return_indices=False):

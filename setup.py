@@ -3,11 +3,11 @@ from setuptools import setup, find_packages
 from itertools import chain
 
 NAME = "morphocell"
-DESCRIPTION = "Morphomeric analysis of 3D cell images"
+DESCRIPTION = "Morphomeric analysis of 3D cell images with CUDA support"
 URL = "https://github.com/alxndrkalinin/morphocell"
 AUTHOR = "Alexandr Kalinin"
 EMAIL = "alxndrkalinin@gmail.com"
-REQUIRES_PYTHON = ">=3.8.0"
+REQUIRES_PYTHON = ">=3.9"
 LICENSE = "MIT"
 
 INSTALL_REQUIRES = ["numpy>=1.20.0", "scikit-image>=0.16.1"]
@@ -67,8 +67,10 @@ setup(
         "Operating System :: OS Independent",
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
         "Topic :: Software Development :: Libraries",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],

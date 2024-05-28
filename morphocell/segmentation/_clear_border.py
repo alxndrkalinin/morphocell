@@ -2,7 +2,8 @@
 
 import numpy as np
 
-from ..gpu import get_image_method, get_array_module
+from ..cuda import get_array_module
+from ..skimage import measure
 
 
 # https://github.com/scikit-image/scikit-image/blob/main/skimage/segmentation/_clear_border.py
@@ -64,7 +65,6 @@ def clear_border(labels, buffer_size=0, bgval=0, in_place=False, mask=None, *, o
            [0, 0, 0, 0, 0, 0, 0, 0, 0]])
     """
     xp = get_array_module(labels)
-    label = get_image_method(labels, "skimage.measure.label")
 
     if any((buffer_size >= s for s in labels.shape)) and mask is None:
         # ignore buffer_size if mask
@@ -102,7 +102,7 @@ def clear_border(labels, buffer_size=0, bgval=0, in_place=False, mask=None, *, o
 
     # Re-label, in case we are dealing with a binary out
     # and to get consistent labeling
-    labels, number = label(out, background=0, return_num=True)
+    labels, number = measure.label(out, background=0, return_num=True)
 
     # determine all objects that are connected to borders
     borders_indices = np.unique(labels[borders])

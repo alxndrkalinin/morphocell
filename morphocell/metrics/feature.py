@@ -6,7 +6,7 @@ https://github.com/rapidsai/cucim/issues/241
 
 import numpy as np
 
-from ..gpu import asnumpy
+from ..cuda import asnumpy
 from .average_precision import compute_matches
 from ..feature.voxel_morphometry import regionprops_table
 

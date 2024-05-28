@@ -11,7 +11,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: 3.8
+        python-version: 3.9
     - name: Update pip
       run: python -m pip install --upgrade pip
     - name: Install linters
@@ -30,10 +30,10 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: 3.8
+        python-version: 3.9
     - name: Update pip
       run: python -m pip install --upgrade pip
     - name: Install Black
-      run: pip install black[jupyter]==22.3
+      run: pip install black[jupyter]==23.7
     - name: Run Black
       run: black --config=black.toml --check .

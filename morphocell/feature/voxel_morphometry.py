@@ -9,15 +9,14 @@ import numpy.typing as npt
 
 import numpy as np
 
-from ..gpu import get_image_method
+from ..skimage import measure
 
 
 def regionprops(
     label_image: npt.ArrayLike, intensity_image: Optional[npt.ArrayLike] = None, spacing: Optional[List] = None
 ):
     """Extract region-based morphological features."""
-    skimage_regionprops = get_image_method(label_image, "skimage.measure.regionprops")
-    return skimage_regionprops(label_image, intensity_image, spacing=spacing)
+    return measure.regionprops(label_image, intensity_image, spacing=spacing)
 
 
 def regionprops_table(
@@ -31,8 +30,7 @@ def regionprops_table(
         properties = properties if "label" in properties else properties + ["label"]
     else:
         properties = []
-    skimage_regionprops_table = get_image_method(label_image, "skimage.measure.regionprops_table")
-    return skimage_regionprops_table(label_image, intensity_image, properties=properties)
+    return measure.regionprops_table(label_image, intensity_image, properties=properties)
 
 
 def calculate_feature_percentiles(

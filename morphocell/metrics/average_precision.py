@@ -12,7 +12,7 @@ https://github.com/MouseLand/cellpose/blob/509ffca33737058b0b4e2e96d506514e10620
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
-from ..gpu import get_device, asnumpy, ascupy
+from ..cuda import get_device, asnumpy, ascupy
 
 
 def _label_overlap_cpu(x, y):
@@ -76,6 +76,9 @@ def _label_overlap(x, y):
 
     if device_x != device_y:
         raise ValueError("x and y should be on the same device.")
+
+    if x.shape != y.shape:
+        raise ValueError(f"x and y should have the same shape. Got {x.shape} and {y.shape} instead.")
 
     if device_x == "GPU":
         return _label_overlap_gpu(x, y)

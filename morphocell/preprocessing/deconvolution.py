@@ -10,7 +10,7 @@ from pathlib import Path
 from skimage import io
 
 from ..image_utils import pad_image
-from ..gpu import RunAsCUDASubprocess
+from ..cuda import RunAsCUDASubprocess
 
 try:
     from flowdec import data as fd_data

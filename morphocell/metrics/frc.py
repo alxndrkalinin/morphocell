@@ -11,7 +11,7 @@ import miplib.analysis.resolution.analysis as fsc_analysis
 import miplib.ui.cli.miplib_entry_point_options as options
 
 from ..image import Image
-from ..gpu import asnumpy, get_array_module
+from ..cuda import asnumpy, get_array_module
 from ..image_utils import (
     max_project,
     crop_tl,
