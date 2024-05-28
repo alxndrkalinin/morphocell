@@ -23,7 +23,7 @@ class SkimageProxy(ModuleType):
 
         def func_wrapper(*args, **kwargs):
             """Wrap skimage or cucim.skimage function based on device capability."""
-            array = args[0]
+            array = args[0] if args else kwargs.get("image", None)
             base_module = "skimage"
 
             if self.cp is not None and hasattr(array, "device"):
