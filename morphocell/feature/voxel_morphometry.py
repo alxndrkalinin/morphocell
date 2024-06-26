@@ -9,6 +9,7 @@ import numpy.typing as npt
 
 import numpy as np
 
+from ..cuda import asnumpy
 from ..skimage import measure
 
 
@@ -31,6 +32,27 @@ def regionprops_table(
     else:
         properties = []
     return measure.regionprops_table(label_image, intensity_image, properties=properties)
+
+
+def extract_features(label_image, features, feature_ranges=None):
+    """Extract features from a label image using regionprops."""
+    numeric_feature_cols = [feat for feat in features if feat != "label"]
+    image_props = regionprops_table(asnumpy(label_image), properties=features)
+
+    feature_values = np.column_stack([image_props[feat] for feat in numeric_feature_cols])
+    if feature_ranges is not None:
+        feature_values = norm_features_by_range(feature_values, numeric_feature_cols, feature_ranges)
+
+    labels = image_props["label"]
+    return labels, feature_values
+
+
+def norm_features_by_range(feature_values, features, min_max_ranges):
+    """Normalize feature values using min-max scaling."""
+    mins = np.asarray([min_max_ranges[feature][0] for feature in features])
+    ranges = np.asarray([min_max_ranges[feature][1] - min_max_ranges[feature][0] for feature in features])
+    ranges[ranges == 0] = np.finfo(np.float32).eps
+    return (feature_values - mins) / ranges
 
 
 def calculate_feature_percentiles(

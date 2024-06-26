@@ -6,17 +6,8 @@ https://github.com/rapidsai/cucim/issues/241
 
 import numpy as np
 
-from ..cuda import asnumpy
 from .average_precision import compute_matches
-from ..feature.voxel_morphometry import regionprops_table
-
-
-def _norm_min_max(feature_values, features, min_max_ranges):
-    """Normalize feature values using min-max scaling."""
-    mins = np.asarray([min_max_ranges[feature][0] for feature in features])
-    ranges = np.asarray([min_max_ranges[feature][1] - min_max_ranges[feature][0] for feature in features])
-    ranges[ranges == 0] = np.finfo(np.float32).eps
-    return (feature_values - mins) / ranges
+from ..feature.voxel_morphometry import extract_features
 
 
 def _calculate_cosine(true_features, pred_features):
@@ -28,52 +19,57 @@ def _calculate_cosine(true_features, pred_features):
     return 1 - np.dot(true_features, pred_features) / (norm_true * norm_pred)
 
 
-def cosine_median(label_true, label_pred, features, thresholds=None, matches_per_threshold=None, min_max_ranges=None):
+def cosine_median(
+    label_image_true,
+    label_image_pred,
+    features,
+    thresholds=None,
+    matches_per_threshold=None,
+    feature_ranges=None,
+    return_features=False,
+):
     """Calculate cosine distance between median features of true and pred masks."""
-    true_props = regionprops_table(asnumpy(label_true), properties=features)
-    pred_props = regionprops_table(asnumpy(label_pred), properties=features)
-    features = [feat for feat in features if feat != "label"]
-    true_features = np.column_stack([true_props[feat] for feat in features])
-    pred_features = np.column_stack([pred_props[feat] for feat in features])
-
-    if min_max_ranges:
-        true_features = _norm_min_max(true_features, features, min_max_ranges)
-        pred_features = _norm_min_max(pred_features, features, min_max_ranges)
+    true_labels, true_features = extract_features(label_image_true, features, feature_ranges)
+    pred_labels, pred_features = extract_features(label_image_pred, features, feature_ranges)
 
     if thresholds is None:
         return _calculate_cosine(np.median(true_features, axis=0), np.median(pred_features, axis=0))
 
     if matches_per_threshold is None:
-        matches_per_threshold = compute_matches(label_true, label_pred, thresholds)
+        matches_per_threshold = compute_matches(label_image_true, label_image_pred, thresholds)
 
     distances = {}
     for th in thresholds:
         true_ind, pred_ind = matches_per_threshold[th]
-        filtered_true_feats = true_features[np.isin(true_props["label"], true_ind)]
-        filtered_pred_feats = pred_features[np.isin(pred_props["label"], pred_ind)]
+        filtered_true_feats = true_features[np.isin(true_labels, true_ind)]
+        filtered_pred_feats = pred_features[np.isin(pred_labels, pred_ind)]
         distances[th] = _calculate_cosine(
             np.median(filtered_true_feats, axis=0), np.median(filtered_pred_feats, axis=0)
         )
-    return distances
+
+    if not return_features:
+        return distances
+    else:
+        return distances, true_features, pred_features
 
 
-def morphology_correlations(masks_true, masks_pred, features, thresholds, matches_per_threshold):
+def morphology_correlations(
+    label_image_true, label_image_pred, features, thresholds, matches_per_threshold, min_max_ranges=None
+):
     """Calculate morphology correlations for matched masks using precomputed matches."""
-    true_props = regionprops_table(asnumpy(masks_true), properties=features)
-    pred_props = regionprops_table(asnumpy(masks_pred), properties=features)
-    features = [feat for feat in features if feat != "label"]
+    true_labels, true_features = extract_features(label_image_true, features, min_max_ranges)
+    pred_labels, pred_features = extract_features(label_image_pred, features, min_max_ranges)
 
     correlations = {}
     for th in thresholds:
         true_ind, pred_ind = matches_per_threshold[th]
-        true_indices = np.isin(true_props["label"], true_ind)
-        pred_indices = np.isin(pred_props["label"], pred_ind)
-
+        true_indices = np.isin(true_labels, true_ind)
+        pred_indices = np.isin(pred_labels, pred_ind)
         if true_indices.any() and pred_indices.any():
-            true_matrix = np.column_stack([true_props[feat][true_indices] for feat in features if feat != "label"])
-            pred_matrix = np.column_stack([pred_props[feat][pred_indices] for feat in features if feat != "label"])
-            if true_matrix.shape[0] > 1 and true_matrix.shape == pred_matrix.shape:
-                correlations[th] = _calculate_correlations(true_matrix, pred_matrix, features)
+            filtered_true_feats = true_features[true_indices]
+            filtered_pred_feats = pred_features[pred_indices]
+            if filtered_true_feats.shape[0] > 1 and filtered_true_feats.shape == filtered_pred_feats.shape:
+                correlations[th] = _calculate_correlations(filtered_true_feats, filtered_pred_feats, features)
             else:
                 correlations[th] = dict(zip(features, [np.nan] * len(features)))
         else:
