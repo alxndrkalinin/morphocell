@@ -10,7 +10,7 @@ EMAIL = "alxndrkalinin@gmail.com"
 REQUIRES_PYTHON = ">=3.9"
 LICENSE = "MIT"
 
-INSTALL_REQUIRES = ["numpy>=1.20.0", "scikit-image>=0.16.1"]
+INSTALL_REQUIRES = ["numpy>=1.20.0", "scikit-image>=0.16.1", "trimesh>=3.3.0"]
 EXTRAS_REQUIRE = {
     "decon": [
         "tensorflow-gpu>=1.14.0,<2.2.1",

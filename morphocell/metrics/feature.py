@@ -7,7 +7,7 @@ https://github.com/rapidsai/cucim/issues/241
 import numpy as np
 
 from .average_precision import compute_matches
-from ..feature.voxel_morphometry import extract_features
+from ..feature.voxel import extract_features
 
 
 def _calculate_cosine(true_features, pred_features):

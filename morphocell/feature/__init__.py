@@ -1,6 +1,6 @@
 """Expose feature extraction functions."""
 
-from .voxel_morphometry import regionprops, regionprops_table
+from .voxel import regionprops, regionprops_table
 
 __all__ = [
     "regionprops",
