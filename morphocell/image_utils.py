@@ -478,3 +478,11 @@ def distance_transform_edt(
             block_params=None,
             float64_distances=False,
         )
+
+
+def clahe(img, kernel_size=(2, 3, 5), clip_limit=0.01, nbins=256):
+    """Apply CLAHE to the image."""
+    assert len(img.shape) == len(kernel_size)
+    kernel_size = np.asarray(img.shape) // kernel_size
+    img = exposure.equalize_adapthist(img, kernel_size=kernel_size, clip_limit=clip_limit, nbins=nbins)
+    return img
