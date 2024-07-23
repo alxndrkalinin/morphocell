@@ -10,10 +10,10 @@ from ..image_utils import get_xy_block_coords, get_xy_block
 from ..skimage import filters, util
 
 
-def get_threshold_otsu(image: npt.ArrayLike, blur_sigma=5):
+def get_threshold_otsu(image: npt.ArrayLike, blur_sigma=5, preserve_range=False, nbins=256) -> npt.ArrayLike:
     """Perform Otsu's thresholding with Gaussian blur."""
-    image = filters.gaussian(image, sigma=blur_sigma)
-    return filters.threshold_otsu(image)
+    image = filters.gaussian(image, sigma=blur_sigma, preserve_range=preserve_range)
+    return filters.threshold_otsu(image, nbins=nbins)
 
 
 def select_nonempty_patches(

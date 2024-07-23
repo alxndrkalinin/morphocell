@@ -32,7 +32,8 @@ def downscale_and_filter(image: npt.ArrayLike, downscale_factor: float = 0.5, fi
     npt.ArrayLike
         Filtered and downsampled image.
     """
-    # cuCIM does not yet support rank-based median filter that is faster on integer values
+    # cuCIM does not yet support rank-based median filter
+    # https://github.com/rapidsai/cucim/blob/0e75c7676dc3dd818ae735d660d0fead88e523ba/python/cucim/src/cucim/skimage/filters/_median.py#L123
     if image.ndim == 2:
         skimage_footprint = morphology.square
     elif image.ndim == 3:
