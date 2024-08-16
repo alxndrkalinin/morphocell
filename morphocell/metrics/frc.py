@@ -96,7 +96,7 @@ class FRC(object):
         n_points = asnumpy(points)
 
         with np.errstate(divide="ignore", invalid="ignore"):
-            frc = np.abs(c1) / np.sqrt(c2 * c3)
+            frc = np.exp(np.log(np.abs(c1)) - 0.5 * (np.log(c2) + np.log(c3)))
             frc[frc == np.inf] = 0.0
             frc = np.nan_to_num(frc)
 
