@@ -28,7 +28,7 @@ def regionprops_table(
 ):
     """Extract region-based morphological features and return in pandas-compatible format."""
     if properties is not None:
-        properties = properties if "label" in properties else properties + ["label"]
+        properties = properties if "label" in properties else np.append(properties, "label")
     else:
         properties = []
     return measure.regionprops_table(label_image, intensity_image, properties=properties)
