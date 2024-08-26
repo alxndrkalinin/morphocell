@@ -38,11 +38,10 @@ def extract_features(label_image, features, feature_ranges=None):
     """Extract features from a label image using regionprops."""
     numeric_feature_cols = [feat for feat in features if feat != "label"]
     image_props = regionprops_table(asnumpy(label_image), properties=features)
-
-    feature_values = np.column_stack([image_props[feat] for feat in numeric_feature_cols])
+    selected_features = [feat for feat in image_props.keys() if feat.split("-")[0] in numeric_feature_cols]
+    feature_values = np.column_stack([image_props[feat] for feat in selected_features])
     if feature_ranges is not None:
-        feature_values = norm_features_by_range(feature_values, numeric_feature_cols, feature_ranges)
-
+        feature_values = norm_features_by_range(feature_values, selected_features, feature_ranges)
     labels = image_props["label"]
     return labels, feature_values
 

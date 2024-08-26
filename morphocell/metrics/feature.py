@@ -7,7 +7,7 @@ https://github.com/rapidsai/cucim/issues/241
 import numpy as np
 
 from .average_precision import compute_matches
-from ..feature.voxel import extract_features
+from ..feature.voxel import extract_features, norm_features_by_range
 
 
 def _calculate_cosine(true_features, pred_features):
@@ -24,13 +24,44 @@ def cosine_median(
     label_image_pred,
     features,
     thresholds=None,
-    matches_per_threshold=None,
     feature_ranges=None,
+    matches_per_threshold=None,
+    precomputed_gt_feature_df=None,
     return_features=False,
 ):
     """Calculate cosine distance between median features of true and pred masks."""
-    true_labels, true_features = extract_features(label_image_true, features, feature_ranges)
+    if precomputed_gt_feature_df is not None:
+        numeric_features = [feat for feat in precomputed_gt_feature_df.columns if feat != "label"]
+
+        if features is None:
+            features = list(set([feat.split("-")[0] for feat in precomputed_gt_feature_df.columns if feat != "label"]))
+        else:
+            assert "label" in precomputed_gt_feature_df.columns, "Label column not found in precomputed features."
+            assert all(
+                feat in precomputed_gt_feature_df.columns for feat in features if feat != "label"
+            ), "Features not found in precomputed features."
+
+        true_labels = precomputed_gt_feature_df["label"].values
+
+        if feature_ranges is None:
+            feature_ranges = {
+                feat: (precomputed_gt_feature_df[feat].min(), precomputed_gt_feature_df[feat].max())
+                for feat in numeric_features
+            }
+            true_features = precomputed_gt_feature_df.drop(columns=["label"]).values
+        else:
+            true_features = norm_features_by_range(
+                precomputed_gt_feature_df[[numeric_features]], numeric_features, feature_ranges
+            )
+
+    else:
+        true_labels, true_features = extract_features(label_image_true, features, feature_ranges)
+
     pred_labels, pred_features = extract_features(label_image_pred, features, feature_ranges)
+
+    nan_mask = np.isnan(true_features).any(axis=0) | np.isnan(pred_features).any(axis=0)
+    true_features = true_features[:, ~nan_mask]
+    pred_features = pred_features[:, ~nan_mask]
 
     if thresholds is None:
         return _calculate_cosine(np.median(true_features, axis=0), np.median(pred_features, axis=0))
