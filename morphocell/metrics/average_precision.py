@@ -47,17 +47,21 @@ def _label_overlap_gpu(x, y):
     Copyright (c) 2024 Alexandr Kalinin
     """
     from cupyx import jit
+    import warnings
 
     x = x.ravel()
     y = y.ravel()
     overlap = np.zeros((1 + int(x.max()), 1 + int(y.max())), dtype=np.uint)
     overlap = ascupy(overlap)  # Convert overlap to CuPy array on GPU
 
-    @jit.rawkernel()
-    def label_overlap_kernel(x, y, overlap, N):
-        idx = jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x
-        if idx < N:
-            jit.atomic_add(overlap, (x[idx], y[idx]), 1)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=FutureWarning, module="cupyx.jit._interface")
+
+        @jit.rawkernel()
+        def label_overlap_kernel(x, y, overlap, N):
+            idx = jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x
+            if idx < N:
+                jit.atomic_add(overlap, (x[idx], y[idx]), 1)
 
     N = x.size
     threads_per_block = 128
