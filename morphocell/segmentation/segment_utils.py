@@ -15,7 +15,9 @@ from ..image_utils import pad_image, label, distance_transform_edt
 from ..skimage import transform, filters, morphology, feature
 
 
-def downscale_and_filter(image: npt.ArrayLike, downscale_factor: float = 0.5, filter_size: int = 3) -> npt.ArrayLike:
+def downscale_and_filter(
+    image: npt.ArrayLike, downscale_factor: float = 0.5, filter_size: int = 3, filter_shape: str = "square"
+) -> npt.ArrayLike:
     """Subsample and filter image prior to segmentiation.
 
     Parameters
@@ -33,11 +35,13 @@ def downscale_and_filter(image: npt.ArrayLike, downscale_factor: float = 0.5, fi
         Filtered and downsampled image.
     """
     # cuCIM does not yet support rank-based median filter
-    # https://github.com/rapidsai/cucim/blob/0e75c7676dc3dd818ae735d660d0fead88e523ba/python/cucim/src/cucim/skimage/filters/_median.py#L123
+    # https://github.com/rapidsai/cucim/blob/main/python/cucim/src/cucim/skimage/filters/_median.py#L124
+    assert filter_shape in ["square", "circular"], "Filter shape must be 'square' or 'circular'."
+
     if image.ndim == 2:
-        skimage_footprint = morphology.square
+        skimage_footprint = morphology.square if filter_shape == "square" else morphology.disk
     elif image.ndim == 3:
-        skimage_footprint = morphology.cube
+        skimage_footprint = morphology.cube if filter_shape == "square" else morphology.ball
     else:
         raise ValueError("Image must be 2D or 3D.")
 
