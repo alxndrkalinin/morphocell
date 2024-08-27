@@ -19,17 +19,14 @@ def _calculate_cosine(true_features, pred_features):
     return 1 - np.dot(true_features, pred_features) / (norm_true * norm_pred)
 
 
-def cosine_median(
-    label_image_true,
-    label_image_pred,
-    features,
-    thresholds=None,
-    feature_ranges=None,
-    matches_per_threshold=None,
-    precomputed_gt_feature_df=None,
-    return_features=False,
-):
-    """Calculate cosine distance between median features of true and pred masks."""
+def filter_nan_features(true_features, pred_features):
+    """Remove features that contain NaNs from both true and predicted feature sets."""
+    nan_mask = np.isnan(true_features).any(axis=0) | np.isnan(pred_features).any(axis=0)
+    return true_features[:, ~nan_mask], pred_features[:, ~nan_mask]
+
+
+def get_true_features(label_image_true, features, feature_ranges, precomputed_gt_feature_df):
+    """Extract or retrieve true features based on precomputed or provided label images."""
     if precomputed_gt_feature_df is not None:
         numeric_features = [feat for feat in precomputed_gt_feature_df.columns if feat != "label"]
 
@@ -53,15 +50,28 @@ def cosine_median(
             true_features = norm_features_by_range(
                 precomputed_gt_feature_df[[numeric_features]], numeric_features, feature_ranges
             )
-
     else:
         true_labels, true_features = extract_features(label_image_true, features, feature_ranges)
 
-    pred_labels, pred_features = extract_features(label_image_pred, features, feature_ranges)
+    return true_labels, true_features, features
 
-    nan_mask = np.isnan(true_features).any(axis=0) | np.isnan(pred_features).any(axis=0)
-    true_features = true_features[:, ~nan_mask]
-    pred_features = pred_features[:, ~nan_mask]
+
+def cosine_median(
+    label_image_true,
+    label_image_pred,
+    features,
+    thresholds=None,
+    feature_ranges=None,
+    matches_per_threshold=None,
+    precomputed_gt_feature_df=None,
+    return_features=False,
+):
+    """Calculate cosine distance between median features of true and pred masks."""
+    true_labels, true_features, features = get_true_features(
+        label_image_true, features, feature_ranges, precomputed_gt_feature_df
+    )
+    pred_labels, pred_features = extract_features(label_image_pred, features, feature_ranges)
+    true_features, pred_features = filter_nan_features(true_features, pred_features)
 
     if thresholds is None:
         return _calculate_cosine(np.median(true_features, axis=0), np.median(pred_features, axis=0))
