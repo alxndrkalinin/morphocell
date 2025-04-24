@@ -5,8 +5,8 @@ from functools import wraps
 
 import numpy.typing as npt
 
-from ..cuda import get_device
 from ..skimage import metrics
+from ..cuda import check_same_device
 
 
 def scale_invariant(fn):
@@ -15,7 +15,7 @@ def scale_invariant(fn):
     @wraps(fn)
     def wrapped(image_true, image_test, *args, scale_invariant=False, **kwargs):
         """Transform input images to be scale invariant."""
-        assert get_device(image_true) == get_device(image_test)
+        check_same_device(image_true, image_test)
         if not scale_invariant:
             return fn(image_true, image_test, *args, **kwargs)
 
@@ -41,8 +41,6 @@ def nrmse(
     data_range: Optional[float] = None,
 ):
     """Compute the normalized root mean squared error (NRMSE) between two images."""
-    assert get_device(image_true) == get_device(image_test), "Images must be on same device."
-
     if data_range is not None:
         mse = metrics.mean_squared_error(image_true, image_test)
         return (mse**0.5) / data_range
@@ -55,7 +53,6 @@ def nrmse(
 @scale_invariant
 def psnr(image_true: npt.ArrayLike, image_test: npt.ArrayLike, data_range: Optional[int] = None):
     """Compute the peak signal to noise ratio (PSNR) between two images."""
-    assert get_device(image_true) == get_device(image_test), "Images must be on same device."
     return metrics.peak_signal_noise_ratio(image_true, image_test, data_range=data_range)
 
 
@@ -72,7 +69,6 @@ def ssim(
     **kwargs,
 ):
     """Compute the mean structural similarity index between two images."""
-    assert get_device(im1) == get_device(im2), "Images must be on same device."
     return metrics.structural_similarity(
         im1,
         im2,

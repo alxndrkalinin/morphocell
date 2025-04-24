@@ -76,6 +76,14 @@ def to_same_device(source_array, reference_array):
     return to_device(source_array, target_device)
 
 
+def check_same_device(*arrays):
+    """Check all provided arrays are on the same device."""
+    devices = [get_device(a) for a in arrays]
+    unique_devices = sorted(set(devices))
+    if len(unique_devices) != 1:
+        raise ValueError(f"All inputs must be on the same device, but found: {unique_devices}")
+
+
 def get_array_module(array) -> ModuleType:
     """Get the NumPy or CuPy method based on argument location."""
     cp = CUDAManager().get_cp()
