@@ -1,5 +1,7 @@
 """Extract features from a label image using trimesh."""
+
 import warnings
+from typing import Any, Optional
 
 import numpy as np
 import trimesh
@@ -12,7 +14,7 @@ from trimesh.curvature import (
 from ..cuda import asnumpy
 
 
-def mesh_feature_list():
+def mesh_feature_list() -> list[str]:
     """Return a list of features extracted from a trimesh object."""
     return [
         "Area",
@@ -38,7 +40,9 @@ def mesh_feature_list():
     ]
 
 
-def extract_features(label_image, features=NotImplemented):
+def extract_features(
+    label_image: np.ndarray, features: Optional[list[str]] = None
+) -> tuple[np.ndarray, np.ndarray]:
     """Extract features from a label image using trimesh."""
     label_image = asnumpy(label_image)
     labels = np.unique(label_image)
@@ -53,13 +57,15 @@ def extract_features(label_image, features=NotImplemented):
     return labels, np.asarray(feature_values)
 
 
-def extract_surface_features(mask):
+def extract_surface_features(mask: np.ndarray) -> dict[str, float]:
     """Generate mesh from a single label mask and extract its surface features."""
     mesh = mask2mesh(mask)
     return extract_mesh_features(mesh)
 
 
-def mask2mesh(mask_3d, marching_cubes_kwargs=None):
+def mask2mesh(
+    mask_3d: np.ndarray, marching_cubes_kwargs: Optional[dict[str, Any]] = None
+) -> trimesh.Trimesh:
     """Convert 3D mask to a mesh using marching cubes."""
     marching_cubes_kwargs = marching_cubes_kwargs or {}
     verts, faces, _, _ = marching_cubes(mask_3d, **marching_cubes_kwargs)
@@ -68,12 +74,12 @@ def mask2mesh(mask_3d, marching_cubes_kwargs=None):
     return mesh
 
 
-def ellipsoid_sphericity(v, sa):
+def ellipsoid_sphericity(v: float, sa: float) -> float:
     """Calculate the sphericity of an ellipsoid given its volume and surface area."""
     return np.power(np.pi, 1 / 3) * np.power(6 * v, 2 / 3) / sa
 
 
-def extract_mesh_features(mesh):
+def extract_mesh_features(mesh: trimesh.Trimesh) -> dict[str, float]:
     """Extract surface features from a trimesh object."""
     axis_len = sorted(mesh.extents)
     intertia_pcs = mesh.principal_inertia_components
@@ -84,7 +90,9 @@ def extract_mesh_features(mesh):
         bounding_volume = mesh.bounding_cylinder.volume
     except Exception as e:
         bounding_volume = 0
-        warnings.warn(f"Unable extract bounding cylinder volume. Returning 0. Exception: {e}")
+        warnings.warn(
+            f"Unable extract bounding cylinder volume. Returning 0. Exception: {e}"
+        )
 
     return {
         "Area": surface_area,
@@ -105,6 +113,10 @@ def extract_mesh_features(mesh):
         "Sphericity": ellipsoid_sphericity(volume, surface_area),
         "Extent": mesh.volume / mesh.bounding_box.volume,
         "Solidity": mesh.volume / mesh.convex_hull.volume,
-        "Avg Gaussian Curvature": discrete_gaussian_curvature_measure(mesh, mesh.vertices, 1).mean(),
-        "Avg Mean Curvature": discrete_mean_curvature_measure(mesh, mesh.vertices, 1).mean(),
+        "Avg Gaussian Curvature": discrete_gaussian_curvature_measure(
+            mesh, mesh.vertices, 1
+        ).mean(),
+        "Avg Mean Curvature": discrete_mean_curvature_measure(
+            mesh, mesh.vertices, 1
+        ).mean(),
     }
