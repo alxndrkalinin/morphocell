@@ -1,21 +1,19 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.2.0
+    rev: v5.0.0
     hooks:
-      - id: trailing-whitespace
+      - id: check-yaml
       - id: end-of-file-fixer
-      - id: requirements-txt-fixer
+      - id: trailing-whitespace
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: 'v0.11.7'
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+        args: [--check]
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v0.942
+    rev: 'v1.15.0'
     hooks:
       - id: mypy
-  - repo: https://github.com/psf/black
-    rev: 23.7.0
-    hooks:
-      - id: black-jupyter
-        args: [--config=black.toml]
-  - repo: https://github.com/pycqa/flake8
-    rev: 6.0.0
-    hooks:
-      - id: flake8
-        additional_dependencies: [flake8-docstrings==1.6.0]
+        args: [--ignore-missing-imports]
