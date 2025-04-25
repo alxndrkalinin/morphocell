@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=64.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "morphocell"
+dynamic = ["version"]
+description = "Morphometric analysis of nD bioimages with CUDA support"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "Alexandr Kalinin", email = "alxndrkalinin@gmail.com" }
+]
+dependencies = [
+    "numpy>=1.20.0",
+    "scikit-image>=0.16.1",
+    "trimesh>=3.3.0",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.urls]
+Homepage = "https://github.com/alxndrkalinin/morphocell"
+Repository = "https://github.com/alxndrkalinin/morphocell"
+
+[project.optional-dependencies]
+decon = [
+    "tensorflow-gpu>=1.14.0,<2.2.1",
+    "flowdec[tf_gpu]>=1.1.0",
+    "pyvirtualdisplay>=2.0",
+    "cloudpickle>=2.0",
+    "py3nvml>=0.2.6",
+]
+frc = [
+    "miplib @ git+https://github.com/alxndrkalinin/miplib@public",
+]
+cellpose = [
+    "cellpose>=0.6.0",
+]
+all = [
+    "morphocell[decon]",
+    "morphocell[frc]",
+    "morphocell[cellpose]",
+]
+
+[tool.setuptools.dynamic]
+version = { attr = "morphocell.__version__" }
+
+[tool.setuptools.packages.find]
+exclude = ["examples*"]
