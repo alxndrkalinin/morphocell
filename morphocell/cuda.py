@@ -1,4 +1,5 @@
 """Contains a class for accessing CUDA-accelerated libraries."""
+
 from types import ModuleType
 
 import warnings
@@ -67,7 +68,9 @@ def to_device(array, device):
     elif device == "CPU":
         return np.asarray(array)
     else:
-        raise ValueError(f"Device should be 'CPU' or 'GPU', unknown requested: {device}.")
+        raise ValueError(
+            f"Device should be 'CPU' or 'GPU', unknown requested: {device}."
+        )
 
 
 def to_same_device(source_array, reference_array):
@@ -81,7 +84,9 @@ def check_same_device(*arrays):
     devices = [get_device(a) for a in arrays]
     unique_devices = sorted(set(devices))
     if len(unique_devices) != 1:
-        raise ValueError(f"All inputs must be on the same device, but found: {unique_devices}")
+        raise ValueError(
+            f"All inputs must be on the same device, but found: {unique_devices}"
+        )
 
 
 def get_array_module(array) -> ModuleType:
@@ -132,12 +137,14 @@ class RunAsCUDASubprocess:
             num_grabbed = 0
             os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
-        assert (
-            num_grabbed == num_gpus
-        ), f"Could not grab {num_gpus} GPU devices with {memory_fraction * 100}% memory available"
+        assert num_grabbed == num_gpus, (
+            f"Could not grab {num_gpus} GPU devices with {memory_fraction * 100}% memory available"
+        )
 
         if os.environ["CUDA_VISIBLE_DEVICES"] == "":
-            os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # see tensorflow issues: #16284, #2175
+            os.environ["CUDA_VISIBLE_DEVICES"] = (
+                "-1"  # see tensorflow issues: #16284, #2175
+            )
 
         # using cloudpickle because it is more flexible about what functions it will
         # pickle (lambda functions, notebook code, etc.)

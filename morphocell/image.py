@@ -1,4 +1,5 @@
 """Contains a simple class for storing image data."""
+
 from typing import Optional, Sequence
 
 from .cuda import to_device, get_device

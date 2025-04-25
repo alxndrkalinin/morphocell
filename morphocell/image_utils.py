@@ -37,13 +37,18 @@ def image_stats(
     }
 
 
-def rescale_xy(image: npt.ArrayLike, scale: float = 1.0, anti_aliasing: bool = True, preserve_range: bool = False):
+def rescale_xy(
+    image: npt.ArrayLike,
+    scale: float = 1.0,
+    anti_aliasing: bool = True,
+    preserve_range: bool = False,
+):
     """Rescale 2D image or 3D image in XY."""
     scale_by = scale if image.ndim == 2 else (1.0, scale, scale)
     return_dtype = image.dtype if preserve_range else np.float32
-    return transform.rescale(image, scale_by, preserve_range=preserve_range, anti_aliasing=anti_aliasing).astype(
-        return_dtype
-    )
+    return transform.rescale(
+        image, scale_by, preserve_range=preserve_range, anti_aliasing=anti_aliasing
+    ).astype(return_dtype)
 
 
 def rescale_isotropic(
@@ -58,13 +63,23 @@ def rescale_isotropic(
 ) -> npt.ArrayLike:
     """Rescale image to isotropic voxels with arbitary Z (voxel) size."""
     if target_z_voxel_size is not None:
-        target_z_size = int(round(img.shape[0] * (voxel_sizes[0] / target_z_voxel_size)))
+        target_z_size = int(
+            round(img.shape[0] * (voxel_sizes[0] / target_z_voxel_size))
+        )
 
     z_size_per_spacing = img.shape[0] * voxel_sizes[0] / np.asarray(voxel_sizes)
     if target_z_size is None:
-        target_z_size = img.shape[0] if downscale_xy else np.round(z_size_per_spacing[1])
+        target_z_size = (
+            img.shape[0] if downscale_xy else np.round(z_size_per_spacing[1])
+        )
     factors = target_z_size / z_size_per_spacing
-    return transform.rescale(img, factors, order=order, preserve_range=preserve_range, anti_aliasing=downscale_xy)
+    return transform.rescale(
+        img,
+        factors,
+        order=order,
+        preserve_range=preserve_range,
+        anti_aliasing=downscale_xy,
+    )
 
 
 def normalize_min_max(
@@ -110,7 +125,10 @@ def pad_image(
 
 
 def pad_image_to_cube(
-    img: npt.ArrayLike, cube_size: Optional[int] = None, mode: str = "reflect", axes: Optional[Sequence[int]] = None
+    img: npt.ArrayLike,
+    cube_size: Optional[int] = None,
+    mode: str = "reflect",
+    axes: Optional[Sequence[int]] = None,
 ):
     """Pad all image axes up to cubic shape."""
     axes = list(range(img.ndim)) if axes is None else axes
@@ -140,7 +158,9 @@ def pad_image_to_shape(img: npt.ArrayLike, new_shape: Sequence, mode: str = "con
     return img
 
 
-def pad_images_to_matching_shape(image1: npt.ArrayLike, image2: npt.ArrayLike, mode: str = "constant"):
+def pad_images_to_matching_shape(
+    image1: npt.ArrayLike, image2: npt.ArrayLike, mode: str = "constant"
+):
     """Apply zero padding to make the size of two Images match."""
     shape = tuple(max(x, y) for x, y in zip(image1.shape, image2.shape))
 
@@ -153,35 +173,46 @@ def pad_images_to_matching_shape(image1: npt.ArrayLike, image2: npt.ArrayLike, m
 
 
 def crop_tl(
-    img: npt.ArrayLike, crop_size: Union[int, Sequence[int]], axes: Optional[Sequence[int]] = None
+    img: npt.ArrayLike,
+    crop_size: Union[int, Sequence[int]],
+    axes: Optional[Sequence[int]] = None,
 ) -> npt.ArrayLike:
     """Crop from the top-left corner."""
     return crop_corner(img, crop_size, axes, "tl")
 
 
 def crop_bl(
-    img: npt.ArrayLike, crop_size: Union[int, Sequence[int]], axes: Optional[Sequence[int]] = None
+    img: npt.ArrayLike,
+    crop_size: Union[int, Sequence[int]],
+    axes: Optional[Sequence[int]] = None,
 ) -> npt.ArrayLike:
     """Crop from the bottom-left corner."""
     return crop_corner(img, crop_size, axes, "bl")
 
 
 def crop_tr(
-    img: npt.ArrayLike, crop_size: Union[int, Sequence[int]], axes: Optional[Sequence[int]] = None
+    img: npt.ArrayLike,
+    crop_size: Union[int, Sequence[int]],
+    axes: Optional[Sequence[int]] = None,
 ) -> npt.ArrayLike:
     """Crop from the top-right corner."""
     return crop_corner(img, crop_size, axes, "tr")
 
 
 def crop_br(
-    img: npt.ArrayLike, crop_size: Union[int, Sequence[int]], axes: Optional[Sequence[int]] = None
+    img: npt.ArrayLike,
+    crop_size: Union[int, Sequence[int]],
+    axes: Optional[Sequence[int]] = None,
 ) -> npt.ArrayLike:
     """Crop from the bottom-right corner."""
     return crop_corner(img, crop_size, axes, "br")
 
 
 def crop_corner(
-    img: npt.ArrayLike, crop_size: Union[int, Sequence[int]], axes: Optional[Sequence[int]] = None, corner: str = "tl"
+    img: npt.ArrayLike,
+    crop_size: Union[int, Sequence[int]],
+    axes: Optional[Sequence[int]] = None,
+    corner: str = "tl",
 ) -> npt.ArrayLike:
     """Crop a corner from the image."""
     axes = [1, 2] if axes is None else axes
@@ -214,7 +245,9 @@ def crop_corner(
 
 
 def crop_center(
-    img: npt.ArrayLike, crop_size: Optional[Union[int, Sequence[int]]], axes: Optional[Sequence[int]] = None
+    img: npt.ArrayLike,
+    crop_size: Optional[Union[int, Sequence[int]]],
+    axes: Optional[Sequence[int]] = None,
 ):
     """Crop from the center of the n-dimensional image."""
     axes = list(range(img.ndim)) if axes is None else axes
@@ -266,7 +299,9 @@ def random_crop(
     crop_h, crop_w = (crop_hw, crop_hw) if isinstance(crop_hw, int) else crop_hw
     height, width = img.shape[1:]
     h_start, w_start = np.random.uniform(), np.random.uniform()
-    x1, y1, x2, y2 = get_random_crop_coords(height, width, crop_h, crop_w, h_start, w_start)
+    x1, y1, x2, y2 = get_random_crop_coords(
+        height, width, crop_h, crop_w, h_start, w_start
+    )
     if return_coordinates:
         return (img[y1:y2, x1:x2], (y1, y2, x1, x2))
     else:
@@ -289,7 +324,10 @@ def crop_to_divisor(
     if len(axes) != len(divisors):
         raise ValueError("Length of 'axes' and 'divisors' must be the same")
 
-    crop_size = [img.shape[axis] - (img.shape[axis] % divisor) for axis, divisor in zip(axes, divisors)]
+    crop_size = [
+        img.shape[axis] - (img.shape[axis] % divisor)
+        for axis, divisor in zip(axes, divisors)
+    ]
 
     if crop_type == "center":
         return crop_center(img, crop_size=crop_size, axes=axes)
@@ -302,24 +340,35 @@ def crop_to_divisor(
     elif crop_type == "br":
         return crop_br(img, crop_size)
     else:
-        raise ValueError("Invalid crop type specified. Choose from 'center', 'tl', 'bl', 'tr', 'br'.")
+        raise ValueError(
+            "Invalid crop type specified. Choose from 'center', 'tl', 'bl', 'tr', 'br'."
+        )
 
 
-def get_xy_block_coords(image_shape: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]):
+def get_xy_block_coords(
+    image_shape: npt.ArrayLike, crop_hw: Union[int, Tuple[int, int]]
+):
     """Compute coordinates of non-overlapping image blocks of specified shape."""
     crop_h, crop_w = (crop_hw, crop_hw) if isinstance(crop_hw, int) else crop_hw
     height, width = image_shape[1:]
 
     block_coords = []  # type: List[Tuple[int, ...]]
     for y in np.arange(0, height // crop_h) * crop_h:
-        block_coords.extend((y, y + crop_h, x, x + crop_w) for x in np.arange(0, width // crop_w) * crop_w)
+        block_coords.extend(
+            (y, y + crop_h, x, x + crop_w)
+            for x in np.arange(0, width // crop_w) * crop_w
+        )
 
     return np.asarray(block_coords).astype(int)
 
 
 def get_xy_block(image: npt.ArrayLike, patch_coordinates: List[int]):
     """Slice subvolume of 3D image by XY coordinates."""
-    return image[:, patch_coordinates[0] : patch_coordinates[1], patch_coordinates[2] : patch_coordinates[3]]
+    return image[
+        :,
+        patch_coordinates[0] : patch_coordinates[1],
+        patch_coordinates[2] : patch_coordinates[3],
+    ]
 
 
 def extract_patches(image: npt.ArrayLike, patch_coordinates: List[List[int]]):
@@ -376,13 +425,21 @@ def checkerboard_split(image, disable_3d_sum=False):
 
     else:
         image1 = (
-            image.astype(np.uint32)[even_index[0], :, :][:, odd_index[1], :][:, :, odd_index[2]]
-            + image.astype(np.uint32)[odd_index[0], :, :][:, odd_index[1], :][:, :, odd_index[2]]
+            image.astype(np.uint32)[even_index[0], :, :][:, odd_index[1], :][
+                :, :, odd_index[2]
+            ]
+            + image.astype(np.uint32)[odd_index[0], :, :][:, odd_index[1], :][
+                :, :, odd_index[2]
+            ]
         )
 
         image2 = (
-            image.astype(np.uint32)[even_index[0], :, :][:, even_index[1], :][:, :, even_index[2]]
-            + image.astype(np.uint32)[odd_index[0], :, :][:, even_index[1], :][:, :, even_index[2]]
+            image.astype(np.uint32)[even_index[0], :, :][:, even_index[1], :][
+                :, :, even_index[2]
+            ]
+            + image.astype(np.uint32)[odd_index[0], :, :][:, even_index[1], :][
+                :, :, even_index[2]
+            ]
         )
 
     return image1, image2
@@ -405,13 +462,21 @@ def reverse_checkerboard_split(image, disable_3d_sum=False):
 
     else:
         image1 = (
-            image.astype(np.uint32)[even_index[0], :, :][:, odd_index[1], :][:, :, even_index[2]]
-            + image.astype(np.uint32)[odd_index[0], :, :][:, even_index[1], :][:, :, odd_index[2]]
+            image.astype(np.uint32)[even_index[0], :, :][:, odd_index[1], :][
+                :, :, even_index[2]
+            ]
+            + image.astype(np.uint32)[odd_index[0], :, :][:, even_index[1], :][
+                :, :, odd_index[2]
+            ]
         )
 
         image2 = (
-            image.astype(np.uint32)[even_index[0], :, :][:, even_index[1], :][:, :, odd_index[2]]
-            + image.astype(np.uint32)[odd_index[0], :, :][:, odd_index[1], :][:, :, even_index[2]]
+            image.astype(np.uint32)[even_index[0], :, :][:, even_index[1], :][
+                :, :, odd_index[2]
+            ]
+            + image.astype(np.uint32)[odd_index[0], :, :][:, odd_index[1], :][
+                :, :, even_index[2]
+            ]
         )
 
     return image1, image2
@@ -463,7 +528,12 @@ def distance_transform_edt(
         from scipy.ndimage import distance_transform_edt
 
         return distance_transform_edt(
-            image, sampling=None, return_distances=True, return_indices=False, distances=None, indices=None
+            image,
+            sampling=None,
+            return_distances=True,
+            return_indices=False,
+            distances=None,
+            indices=None,
         )
     else:
         # cuCIM access interface is different from scipy.ndimage
@@ -485,5 +555,7 @@ def clahe(img, kernel_size=(2, 3, 5), clip_limit=0.01, nbins=256):
     """Apply CLAHE to the image."""
     assert len(img.shape) == len(kernel_size)
     kernel_size = np.asarray(img.shape) // kernel_size
-    img = exposure.equalize_adapthist(img, kernel_size=kernel_size, clip_limit=clip_limit, nbins=nbins)
+    img = exposure.equalize_adapthist(
+        img, kernel_size=kernel_size, clip_limit=clip_limit, nbins=nbins
+    )
     return img

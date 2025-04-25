@@ -12,7 +12,12 @@ except ImportError:
     _CELLPOSE_AVAILABLE = False
     warnings.warn("Cellpose is not available. Cellpose segmentation will not work.")
 
-from .segment_utils import downscale_and_filter, remove_touching_objects, clear_xy_borders, remove_small_objects
+from .segment_utils import (
+    downscale_and_filter,
+    remove_touching_objects,
+    clear_xy_borders,
+    remove_small_objects,
+)
 
 
 def cellpose_eval(
@@ -48,7 +53,14 @@ def cellpose_segment(
         )
 
     image = downscale_and_filter(image, downscale_factor=downscale_factor)
-    masks = cellpose_eval(image, model_type=model_type, omni=omni, channels=channels, diameter=diameter, do_3D=do_3D)
+    masks = cellpose_eval(
+        image,
+        model_type=model_type,
+        omni=omni,
+        channels=channels,
+        diameter=diameter,
+        do_3D=do_3D,
+    )
     masks = remove_touching_objects(masks, border_value=border_value)
     masks = clear_xy_borders(masks)
     masks = remove_small_objects(masks, min_size=min_size)

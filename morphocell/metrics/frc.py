@@ -6,7 +6,10 @@ from argparse import Namespace
 
 import miplib.data.iterators.fourier_ring_iterators as frc_iterators
 import miplib.data.iterators.fourier_shell_iterators as fsc_iterators
-from miplib.data.containers.fourier_correlation_data import FourierCorrelationData, FourierCorrelationDataCollection
+from miplib.data.containers.fourier_correlation_data import (
+    FourierCorrelationData,
+    FourierCorrelationDataCollection,
+)
 import miplib.analysis.resolution.analysis as fsc_analysis
 import miplib.ui.cli.miplib_entry_point_options as options
 
@@ -40,7 +43,9 @@ def _empty_aggregate(*args: npt.ArrayLike, **kwargs) -> npt.ArrayLike:
 def frc_checkerboard_split(image: Image, reverse=False, disable_3d_sum=False):
     """Split image into two by checkerboard pattern."""
     if reverse:
-        image1, image2 = reverse_checkerboard_split(image.data, disable_3d_sum=disable_3d_sum)
+        image1, image2 = reverse_checkerboard_split(
+            image.data, disable_3d_sum=disable_3d_sum
+        )
     else:
         image1, image2 = checkerboard_split(image.data, disable_3d_sum=disable_3d_sum)
     image1 = Image(image1, spacing=image.spacing, device=image.device)
@@ -110,7 +115,11 @@ class FRC(object):
 
 # https://github.com/sakoho81/miplib/blob/public/miplib/analysis/resolution/fourier_ring_correlation.py
 def calculate_single_image_frc(
-    image: Image, args: Namespace, average: bool = True, trim: bool = True, z_correction: int = 1
+    image: Image,
+    args: Namespace,
+    average: bool = True,
+    trim: bool = True,
+    z_correction: int = 1,
 ):
     """Calculate a regular FRC with a single image input.
 
@@ -150,7 +159,9 @@ def calculate_single_image_frc(
         frc_task = FRC(image1.data, image2.data, iterator)
 
         frc_data[0].correlation["correlation"] *= 0.5
-        frc_data[0].correlation["correlation"] += 0.5 * frc_task.execute().correlation["correlation"]
+        frc_data[0].correlation["correlation"] += (
+            0.5 * frc_task.execute().correlation["correlation"]
+        )
 
     def func(x, a, b, c, d):
         return a * np.exp(c * (x - b)) + d
@@ -158,7 +169,9 @@ def calculate_single_image_frc(
     params = [0.95988146, 0.97979108, 13.90441896, 0.55146136]
 
     # Analyze results
-    analyzer = fsc_analysis.FourierCorrelationAnalysis(frc_data, image1.spacing[0], args)
+    analyzer = fsc_analysis.FourierCorrelationAnalysis(
+        frc_data, image1.spacing[0], args
+    )
 
     result = analyzer.execute(z_correction=z_correction)[0]
     point = result.resolution["resolution-point"][1]
@@ -185,14 +198,18 @@ def calculate_frc(
         xp = get_array_module(image)
         ndarray = getattr(xp, "ndarray")  # avoid mypy complains
         if not isinstance(image, ndarray):
-            raise ValueError("FRC: incorrect input, should be 2D Image, Numpy or CuPy array.")
+            raise ValueError(
+                "FRC: incorrect input, should be 2D Image, Numpy or CuPy array."
+            )
         if isinstance(scales, (int, float)):
             scales = [scales, scales]
         image = Image(image, scales)
 
     # assert image.shape[0] == image.shape[1], "FRC: input image should be square."
     assert len(image.spacing) == 2
-    verboseprint(f"The image dimensions are {image.shape} and spacing {image.spacing} um.")  # type: ignore[operator]
+    verboseprint(
+        f"The image dimensions are {image.shape} and spacing {image.spacing} um."
+    )  # type: ignore[operator]
 
     args_list = (
         f"None --bin-delta={bin_delta} --frc-curve-fit-type=smooth-spline "
@@ -201,7 +218,9 @@ def calculate_frc(
     args = options.get_frc_script_options(args_list)
     frc_result = calculate_single_image_frc(image, args)
 
-    frc_result = frc_result.resolution["resolution"] if return_resolution else frc_result
+    frc_result = (
+        frc_result.resolution["resolution"] if return_resolution else frc_result
+    )
     return frc_result
 
 
@@ -224,13 +243,19 @@ def preprocess_img_cubes(
             xp = get_array_module(img_cube)
             ndarray = getattr(xp, "ndarray")  # avoid mypy complains
             if not isinstance(img_cube, ndarray):
-                raise ValueError("FSC: incorrect input, should be 3D Image, Numpy or CuPy array.")
+                raise ValueError(
+                    "FSC: incorrect input, should be 3D Image, Numpy or CuPy array."
+                )
 
         if isinstance(scales, (int, float)):
             scales = [scales, scales, scales]
 
         if len(set(img_cube.shape)) > 1 and zero_padding:
-            img_cube = pad_image_to_cube(img_cube.data) if isinstance(img_cube, Image) else pad_image_to_cube(img_cube)
+            img_cube = (
+                pad_image_to_cube(img_cube.data)
+                if isinstance(img_cube, Image)
+                else pad_image_to_cube(img_cube)
+            )
             assert len(set(img_cube.shape)) == 1, "FSC: image should be a cube."
 
         if cube_shape is None:
@@ -239,7 +264,9 @@ def preprocess_img_cubes(
             raise ValueError("FSC: all input images should have the same shape.")
 
         img_cube = Image(img_cube, scales)
-        verboseprint(f"FSC: image dimensions are {img_cube.shape} and spacing {img_cube.spacing} um.")  # type: ignore[operator]
+        verboseprint(
+            f"FSC: image dimensions are {img_cube.shape} and spacing {img_cube.spacing} um."
+        )  # type: ignore[operator]
         img_cubes_processed.append(img_cube)
 
     return img_cubes_processed
@@ -267,11 +294,17 @@ def calculate_fsc_result(
 
     if len(img_cubes_processed) == 1:
         return calculate_one_image_sectioned_fsc(
-            img_cubes_processed[0], args, z_correction=z_correction, disable_3d_sum=disable_3d_sum
+            img_cubes_processed[0],
+            args,
+            z_correction=z_correction,
+            disable_3d_sum=disable_3d_sum,
         )
     elif len(img_cubes_processed) == 2:
         return calculate_two_image_sectioned_fsc(
-            img_cubes_processed[0], img_cubes_processed[1], args, z_correction=z_correction
+            img_cubes_processed[0],
+            img_cubes_processed[1],
+            args,
+            z_correction=z_correction,
         )
     else:
         raise ValueError("FSC: incorrect number of input images. Should be 1 or 2.")
@@ -306,13 +339,19 @@ def calculate_fsc(
     """Calculate either single- or two-image FSC-based 3D image resolution."""
     img_cubes_processed = preprocess_img_cubes(img_cubes, scales, zero_padding, verbose)
     fsc_result = calculate_fsc_result(
-        img_cubes_processed, bin_delta, resolution_threshold, z_correction, disable_3d_sum
+        img_cubes_processed,
+        bin_delta,
+        resolution_threshold,
+        z_correction,
+        disable_3d_sum,
     )
     return extract_resolution(fsc_result, return_resolution)
 
 
 # https://github.com/sakoho81/miplib/blob/public/miplib/analysis/resolution/fourier_shell_correlation.py
-def calculate_one_image_sectioned_fsc(image, args, z_correction=1.0, disable_3d_sum=False):
+def calculate_one_image_sectioned_fsc(
+    image, args, z_correction=1.0, disable_3d_sum=False
+):
     """Calculate one-image sectioned FSC.
 
     I assume here that prior to calling the function,
@@ -488,7 +527,9 @@ def grid_crop_resolution(
         xp = get_array_module(image)
         ndarray = getattr(xp, "ndarray")  # avoid mypy complains
         if not isinstance(image, ndarray):
-            raise ValueError("FRC: incorrect input, should be 2D Image, Numpy or CuPy array.")
+            raise ValueError(
+                "FRC: incorrect input, should be 2D Image, Numpy or CuPy array."
+            )
 
         if isinstance(scales, (int, float)):
             scales = [scales, scales, scales]
@@ -617,7 +658,9 @@ def five_crop_resolution(
 
             xz_slice = loc_image[:, xz_slices[slice_idx], :]
 
-            padded_xz_slice = pad_image(xz_slice, (xz_slice.shape[1] - xz_slice.shape[0]) // 2, 0, pad_mode)
+            padded_xz_slice = pad_image(
+                xz_slice, (xz_slice.shape[1] - xz_slice.shape[0]) // 2, 0, pad_mode
+            )
 
             xz_slice_resolutions.append(
                 calculate_frc(
@@ -653,8 +696,12 @@ def frc_resolution_difference(
     if isinstance(scales, (int, float)):
         scales = (scales, scales, scales)
     if np.any(np.asarray(scales) != 1.0):
-        image1 = rescale_isotropic(image1, voxel_sizes=scales, downscale_xy=downscale_xy)
-        image2 = rescale_isotropic(image2, voxel_sizes=scales, downscale_xy=downscale_xy)
+        image1 = rescale_isotropic(
+            image1, voxel_sizes=scales, downscale_xy=downscale_xy
+        )
+        image2 = rescale_isotropic(
+            image2, voxel_sizes=scales, downscale_xy=downscale_xy
+        )
 
     image1_res = grid_crop_resolution(
         image1,
@@ -670,4 +717,6 @@ def frc_resolution_difference(
         aggregate=aggregate,
         verbose=verbose,
     )
-    return (aggregate(image2_res[axis]) - aggregate(image1_res[axis])) * 1000  # return diff in nm
+    return (
+        aggregate(image2_res[axis]) - aggregate(image1_res[axis])
+    ) * 1000  # return diff in nm

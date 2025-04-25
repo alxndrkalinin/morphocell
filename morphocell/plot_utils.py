@@ -30,7 +30,9 @@ def show_2d(
     cmap: str = "gray",
 ) -> Figure:
     """Max project and display 3D image."""
-    return show_image(max_project(img, axis), figsize=figsize, bit_depth=bit_depth, cmap=cmap)
+    return show_image(
+        max_project(img, axis), figsize=figsize, bit_depth=bit_depth, cmap=cmap
+    )
 
 
 def show_image_error(
@@ -41,6 +43,8 @@ def show_image_error(
 ) -> Figure:
     """Display error map between teo images."""
     plt.figure(figsize=figsize)
-    fig = plt.imshow(img, cmap=cmap, vmin=(-(2**bit_depth) - 1), vmax=(2**bit_depth - 1))
+    fig = plt.imshow(
+        img, cmap=cmap, vmin=(-(2**bit_depth) - 1), vmax=(2**bit_depth - 1)
+    )
     plt.axis("off")
     return fig

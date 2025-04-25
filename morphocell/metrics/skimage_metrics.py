@@ -45,15 +45,23 @@ def nrmse(
         mse = metrics.mean_squared_error(image_true, image_test)
         return (mse**0.5) / data_range
     elif normalization is not None:
-        return metrics.normalized_root_mse(image_true, image_test, normalization=normalization)
+        return metrics.normalized_root_mse(
+            image_true, image_test, normalization=normalization
+        )
     else:
         return metrics.normalized_root_mse(image_true, image_test)
 
 
 @scale_invariant
-def psnr(image_true: npt.ArrayLike, image_test: npt.ArrayLike, data_range: Optional[int] = None):
+def psnr(
+    image_true: npt.ArrayLike,
+    image_test: npt.ArrayLike,
+    data_range: Optional[int] = None,
+):
     """Compute the peak signal to noise ratio (PSNR) between two images."""
-    return metrics.peak_signal_noise_ratio(image_true, image_test, data_range=data_range)
+    return metrics.peak_signal_noise_ratio(
+        image_true, image_test, data_range=data_range
+    )
 
 
 @scale_invariant

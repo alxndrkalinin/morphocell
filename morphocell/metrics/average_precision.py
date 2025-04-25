@@ -8,7 +8,6 @@ Copyright © 2023 Howard Hughes Medical Institute, Authored by Carsen Stringer a
 https://github.com/MouseLand/cellpose/blob/509ffca33737058b0b4e2e96d506514e10620eb3/cellpose/metrics.py
 """
 
-
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
@@ -55,7 +54,9 @@ def _label_overlap_gpu(x, y):
     overlap = ascupy(overlap)  # Convert overlap to CuPy array on GPU
 
     with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=FutureWarning, module="cupyx.jit._interface")
+        warnings.filterwarnings(
+            "ignore", category=FutureWarning, module="cupyx.jit._interface"
+        )
 
         @jit.rawkernel()
         def label_overlap_kernel(x, y, overlap, N):
@@ -82,7 +83,9 @@ def _label_overlap(x, y):
         raise ValueError("x and y should be on the same device.")
 
     if x.shape != y.shape:
-        raise ValueError(f"x and y should have the same shape. Got {x.shape} and {y.shape} instead.")
+        raise ValueError(
+            f"x and y should have the same shape. Got {x.shape} and {y.shape} instead."
+        )
 
     if device_x == "GPU":
         return _label_overlap_gpu(x, y)

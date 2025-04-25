@@ -16,7 +16,10 @@ from ..skimage import transform, filters, morphology, feature
 
 
 def downscale_and_filter(
-    image: npt.ArrayLike, downscale_factor: float = 0.5, filter_size: int = 3, filter_shape: str = "square"
+    image: npt.ArrayLike,
+    downscale_factor: float = 0.5,
+    filter_size: int = 3,
+    filter_shape: str = "square",
 ) -> npt.ArrayLike:
     """Subsample and filter image prior to segmentiation.
 
@@ -36,12 +39,18 @@ def downscale_and_filter(
     """
     # cuCIM does not yet support rank-based median filter
     # https://github.com/rapidsai/cucim/blob/main/python/cucim/src/cucim/skimage/filters/_median.py#L124
-    assert filter_shape in ["square", "circular"], "Filter shape must be 'square' or 'circular'."
+    assert filter_shape in ["square", "circular"], (
+        "Filter shape must be 'square' or 'circular'."
+    )
 
     if image.ndim == 2:
-        skimage_footprint = morphology.square if filter_shape == "square" else morphology.disk
+        skimage_footprint = (
+            morphology.square if filter_shape == "square" else morphology.disk
+        )
     elif image.ndim == 3:
-        skimage_footprint = morphology.cube if filter_shape == "square" else morphology.ball
+        skimage_footprint = (
+            morphology.cube if filter_shape == "square" else morphology.ball
+        )
     else:
         raise ValueError("Image must be 2D or 3D.")
 
@@ -69,7 +78,9 @@ def check_labeled_binary(image):
     unique_values = np.unique(image)
     assert len(unique_values) > 1, "Image is constant."
     if len(unique_values) == 2:
-        warnings.warn("Only one label was provided in the image. Make sure to label components first.")
+        warnings.warn(
+            "Only one label was provided in the image. Make sure to label components first."
+        )
 
 
 def cleanup_segmentation(
@@ -85,7 +96,9 @@ def cleanup_segmentation(
     # first 3 transforms preserve labels
     if min_obj_size is not None:
         # min_obj_size = to_device(min_obj_size, get_device(label_image))
-        label_image = morphology.remove_small_objects(label_image, min_size=min_obj_size)
+        label_image = morphology.remove_small_objects(
+            label_image, min_size=min_obj_size
+        )
 
     if max_obj_size is not None:
         label_image = remove_large_objects(label_image, max_size=max_obj_size)
@@ -97,7 +110,9 @@ def cleanup_segmentation(
     if max_hole_size is not None:
         for label_id in np.unique(label_image)[1:]:
             mask = label_image == label_id
-            filled_mask = morphology.remove_small_holes(mask, area_threshold=max_hole_size)
+            filled_mask = morphology.remove_small_holes(
+                mask, area_threshold=max_hole_size
+            )
             label_image[filled_mask] = label_id
 
     return label(label_image).astype(np.uint8)
@@ -137,7 +152,10 @@ def find_objects(label_image, max_label=None):
 
         slices = []
         for dim in range(mask.ndim):
-            axis_indices = np.any(mask, axis=tuple(range(mask.ndim))[:dim] + tuple(range(mask.ndim))[dim + 1 :])
+            axis_indices = np.any(
+                mask,
+                axis=tuple(range(mask.ndim))[:dim] + tuple(range(mask.ndim))[dim + 1 :],
+            )
             if not axis_indices.any():
                 slices.append(None)
                 continue
@@ -150,7 +168,9 @@ def find_objects(label_image, max_label=None):
     return object_slices
 
 
-def remove_large_objects(label_image: npt.ArrayLike, max_size: int = 100000) -> npt.ArrayLike:
+def remove_large_objects(
+    label_image: npt.ArrayLike, max_size: int = 100000
+) -> npt.ArrayLike:
     """Remove objects with volume above specified threshold."""
     check_labeled_binary(label_image)
     label_volumes = np.bincount(label_image.ravel())
@@ -160,7 +180,9 @@ def remove_large_objects(label_image: npt.ArrayLike, max_size: int = 100000) -> 
     return label_image
 
 
-def remove_small_objects(label_image: npt.ArrayLike, min_size: int = 500) -> npt.ArrayLike:
+def remove_small_objects(
+    label_image: npt.ArrayLike, min_size: int = 500
+) -> npt.ArrayLike:
     """Remove objects with volume below specified threshold."""
     check_labeled_binary(label_image)
     label_image = morphology.remove_small_objects(label_image, min_size=min_size)
@@ -172,12 +194,16 @@ def clear_xy_borders(label_image: npt.ArrayLike, buffer_size: int = 0) -> npt.Ar
     check_labeled_binary(label_image)
     if label_image.ndim == 2:
         return clear_border(label_image, buffer_size=buffer_size)
-    label_image = pad_image(label_image, (buffer_size + 1, buffer_size + 1), mode="constant")
+    label_image = pad_image(
+        label_image, (buffer_size + 1, buffer_size + 1), mode="constant"
+    )
     label_image = clear_border(label_image, buffer_size=buffer_size)
     return label(label_image[buffer_size + 1 : -(buffer_size + 1), :, :])
 
 
-def remove_touching_objects(label_image: npt.ArrayLike, border_value: int = 100) -> npt.ArrayLike:
+def remove_touching_objects(
+    label_image: npt.ArrayLike, border_value: int = 100
+) -> npt.ArrayLike:
     """Find labelled masks that overlap and remove from the image."""
     check_labeled_binary(label_image)
 
@@ -192,7 +218,9 @@ def remove_touching_objects(label_image: npt.ArrayLike, border_value: int = 100)
             masks_copy[mask_outline] += border_value
 
             if masks_copy[masks_copy > border_value].sum() > 0:
-                overlap_masks = np.unique(masks_copy[masks_copy > border_value]) - border_value
+                overlap_masks = (
+                    np.unique(masks_copy[masks_copy > border_value]) - border_value
+                )
                 exclude_masks += [mask_idx] + list(overlap_masks)
 
     for exclude_mask in exclude_masks:
@@ -203,7 +231,9 @@ def remove_touching_objects(label_image: npt.ArrayLike, border_value: int = 100)
 
 def remove_thin_objects(label_image, min_z=2):
     """Remove objects thinner than a specified minimum value in Z."""
-    unique_labels = [regionlabel for regionlabel in np.unique(label_image) if regionlabel != 0]
+    unique_labels = [
+        regionlabel for regionlabel in np.unique(label_image) if regionlabel != 0
+    ]
     for regionlabel in unique_labels:
         mask = label_image == regionlabel
 
@@ -223,7 +253,9 @@ def segment_watershed(image, ball_size=15):
     device = get_device(image)
 
     distance = distance_transform_edt(image)
-    coords = feature.peak_local_max(distance, footprint=morphology.ball(ball_size), labels=image)
+    coords = feature.peak_local_max(
+        distance, footprint=morphology.ball(ball_size), labels=image
+    )
 
     mask = np.zeros(distance.shape, dtype=bool)
     mask[tuple(asnumpy(coords.T))] = True
@@ -254,7 +286,9 @@ def fill_label_holes(lbl_img, **binary_fill_holes_kwargs):
     """
 
     def grow(sl, interior):
-        return tuple(slice(s.start - int(w[0]), s.stop + int(w[1])) for s, w in zip(sl, interior))
+        return tuple(
+            slice(s.start - int(w[0]), s.stop + int(w[1])) for s, w in zip(sl, interior)
+        )
 
     def shrink(interior):
         return tuple(slice(int(w[0]), (-1 if w[1] else None)) for w in interior)
@@ -268,14 +302,19 @@ def fill_label_holes(lbl_img, **binary_fill_holes_kwargs):
         interior = [(s.start > 0, s.stop < sz) for s, sz in zip(sl, lbl_img.shape)]
         shrink_slice = shrink(interior)
         grown_mask = lbl_img[grow(sl, interior)] == i
-        mask_filled = _binary_fill_holes(grown_mask, **binary_fill_holes_kwargs)[shrink_slice]
+        mask_filled = _binary_fill_holes(grown_mask, **binary_fill_holes_kwargs)[
+            shrink_slice
+        ]
         lbl_img_filled[sl][mask_filled] = i
 
     return lbl_img_filled
 
 
 def fill_holes_slicer(
-    image: npt.ArrayLike, area_threshold: int = 1000, num_iterations: int = 1, axes: Optional[Sequence[int]] = None
+    image: npt.ArrayLike,
+    area_threshold: int = 1000,
+    num_iterations: int = 1,
+    axes: Optional[Sequence[int]] = None,
 ):
     """
     Fill holes in slices of binary or labeled objects.
@@ -293,9 +332,13 @@ def fill_holes_slicer(
                 for i in range(binary.shape[axis]):
                     slicers[axis] = slice(i, i + 1)
                     binary_slice = binary[tuple(slicers)]
-                    filled_slice = morphology.remove_small_holes(binary_slice, area_threshold)
+                    filled_slice = morphology.remove_small_holes(
+                        binary_slice, area_threshold
+                    )
                     if filled_slice.shape != binary_slice.shape:
-                        raise ValueError("Shape mismatch between filled_slice and binary_slice")
+                        raise ValueError(
+                            "Shape mismatch between filled_slice and binary_slice"
+                        )
                     binary[tuple(slicers)] = filled_slice
 
         image[binary] = label_id

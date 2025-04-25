@@ -19,7 +19,9 @@ try:
     _TF_AVAILABLE = True
 except ImportError:
     _TF_AVAILABLE = False
-    warnings.warn("FlowDec / TensorFlow are not available. FlowDec deconvolution will not work.")
+    warnings.warn(
+        "FlowDec / TensorFlow are not available. FlowDec deconvolution will not work."
+    )
 
 try:
     from pyvirtualdisplay import Display
@@ -27,7 +29,9 @@ try:
     _IS_XVBF_AVAILABLE = True
 except Exception:
     _IS_XVBF_AVAILABLE = False
-    warnings.warn("pyvirtualdisplay is not available. DeconcolutionLab2 deconvolution will not work.")
+    warnings.warn(
+        "pyvirtualdisplay is not available. DeconcolutionLab2 deconvolution will not work."
+    )
 
 
 def check_tf_available():
@@ -102,7 +106,9 @@ def richardson_lucy_dl2(
 
     # read zstack again
     if result.returncode == 0:
-        verboseprint(f"Reading deconvolved image from {str(tmp_dir)}/tmp_image_RL_{n_iter}.tif")  # type: ignore[operator]
+        verboseprint(
+            f"Reading deconvolved image from {str(tmp_dir)}/tmp_image_RL_{n_iter}.tif"
+        )  # type: ignore[operator]
         decon_image = io.imread(str(tmp_dir / f"tmp_image_RL_{n_iter}.tif"))
         verboseprint(f"Deconvolved image shape: {decon_image.shape}")  # type: ignore[operator]
         return decon_image
@@ -154,10 +160,14 @@ def richardson_lucy_flowdec(
     psf = psf if isinstance(psf, np.ndarray) else io.imread(psf)
 
     # assert image.shape == psf.shape
-    verboseprint(f"Deconvolving image shape {image.shape} with psf shape {psf.shape} for {n_iter} iterations.")  # type: ignore[operator]
+    verboseprint(
+        f"Deconvolving image shape {image.shape} with psf shape {psf.shape} for {n_iter} iterations."
+    )  # type: ignore[operator]
 
     if subprocess_cuda:
-        res = _run_rl_flowdec_subprocess(image, psf, n_iter, start_mode, observer_fn, device)
+        res = _run_rl_flowdec_subprocess(
+            image, psf, n_iter, start_mode, observer_fn, device
+        )
     else:
         res = _run_rl_flowdec(image, psf, n_iter, start_mode, observer_fn, device)
 
@@ -241,18 +251,36 @@ def decon_iter_num_finder(
             # stop metric calculations after reaching threshold to save time
             if thresh_iter == 0:  # threshold not reached
                 prev_image = results[i - 1]["iter_image"]
-                curr_image = restored_image[pad_size_z : prev_image.shape[0] + pad_size_z, :, :].astype(np.uint16)
+                curr_image = restored_image[
+                    pad_size_z : prev_image.shape[0] + pad_size_z, :, :
+                ].astype(np.uint16)
                 metric_result = metric_fn(prev_image, curr_image, **metric_kwargs)
 
-                metric_gain = metric_result[0] if isinstance(metric_result, tuple) else metric_result
-                results.append({"metric_gain": metric_gain, "iter_image": curr_image, "metric_result": metric_result})
+                metric_gain = (
+                    metric_result[0]
+                    if isinstance(metric_result, tuple)
+                    else metric_result
+                )
+                results.append(
+                    {
+                        "metric_gain": metric_gain,
+                        "iter_image": curr_image,
+                        "metric_result": metric_result,
+                    }
+                )
                 verboseprint(f"Iteration {i}: improvement {metric_gain:.8f}")
 
                 if (i > 1) and (metric_gain > metric_threshold):  # threshold reached
                     thresh_iter = i
-                    metric_gain_total = metric_fn(results[0]["iter_image"], results[-1]["iter_image"], **metric_kwargs)
+                    metric_gain_total = metric_fn(
+                        results[0]["iter_image"],
+                        results[-1]["iter_image"],
+                        **metric_kwargs,
+                    )
                     metric_gain_total = (
-                        metric_gain_total[0] if isinstance(metric_gain_total, tuple) else metric_gain_total
+                        metric_gain_total[0]
+                        if isinstance(metric_gain_total, tuple)
+                        else metric_gain_total
                     )
 
                     verboseprint(
