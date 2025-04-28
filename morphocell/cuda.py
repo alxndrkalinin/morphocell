@@ -1,6 +1,7 @@
 """Contains a class for accessing CUDA-accelerated libraries."""
 
 from types import ModuleType
+from typing import Any, Callable
 
 import warnings
 import os
@@ -20,7 +21,7 @@ class CUDAManager:
             cls._instance.init_gpu()
         return cls._instance
 
-    def init_gpu(self):
+    def init_gpu(self) -> None:
         """Initialize GPU resources."""
         try:
             import cupy as cp
@@ -40,16 +41,16 @@ class CUDAManager:
                 "Unable to detect CUDA-compatible GPU at the runtime. Check that driver is installed and GPU is visible. Falling back to CPU."
             )
 
-    def get_cp(self):
+    def get_cp(self) -> ModuleType | None:
         """Return CuPy if available."""
         return self.cp
 
-    def get_num_gpus(self):
+    def get_num_gpus(self) -> int:
         """Return number of available GPUs."""
         return self.num_gpus
 
 
-def get_device(array) -> str:
+def get_device(array: np.ndarray) -> str:
     """Return current image device."""
     cp = CUDAManager().get_cp()
     if cp is not None and hasattr(array, "device"):
@@ -57,7 +58,7 @@ def get_device(array) -> str:
     return "CPU"
 
 
-def to_device(array, device):
+def to_device(array: np.ndarray, device: str) -> np.ndarray:
     """Move array to the requested device."""
     cp = CUDAManager().get_cp()
     if device == "GPU":
@@ -73,13 +74,13 @@ def to_device(array, device):
         )
 
 
-def to_same_device(source_array, reference_array):
+def to_same_device(source_array: np.ndarray, reference_array: np.ndarray) -> np.ndarray:
     """Move the source_array to the same device as reference_array."""
     target_device = get_device(reference_array)
     return to_device(source_array, target_device)
 
 
-def check_same_device(*arrays):
+def check_same_device(*arrays: np.ndarray) -> None:
     """Check all provided arrays are on the same device."""
     devices = [get_device(a) for a in arrays]
     unique_devices = sorted(set(devices))
@@ -89,7 +90,7 @@ def check_same_device(*arrays):
         )
 
 
-def get_array_module(array) -> ModuleType:
+def get_array_module(array: np.ndarray) -> ModuleType:
     """Get the NumPy or CuPy method based on argument location."""
     cp = CUDAManager().get_cp()
     if cp is not None:
@@ -97,7 +98,7 @@ def get_array_module(array) -> ModuleType:
     return np
 
 
-def asnumpy(array):
+def asnumpy(array: np.ndarray) -> np.ndarray:
     """Move (or keep) array to CPU."""
     cp = CUDAManager().get_cp()
     if isinstance(array, np.ndarray):
@@ -107,7 +108,7 @@ def asnumpy(array):
     return np.asarray(array)
 
 
-def ascupy(array):
+def ascupy(array: np.ndarray) -> object:
     """Move (or keep) array to GPU."""
     cp = CUDAManager().get_cp()
     if cp is not None:
@@ -118,13 +119,15 @@ def ascupy(array):
 class RunAsCUDASubprocess:
     """Decorator to run TensorFlow in a separate process."""
 
-    def __init__(self, num_gpus=0, memory_fraction=0.8):
+    def __init__(self, num_gpus: int = 0, memory_fraction: float = 0.8) -> None:
         """Initialize decorator with number of GPUs and amount of available memory."""
         self._num_gpus = num_gpus
         self._memory_fraction = memory_fraction
 
     @staticmethod
-    def _subprocess_code(num_gpus, memory_fraction, fn, args):
+    def _subprocess_code(
+        num_gpus: int, memory_fraction: float, fn: bytes, args: tuple
+    ) -> Any:
         # set the env vars inside the subprocess so that we don't alter the parent env
         os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see tensorflow issue #152
         try:
@@ -152,10 +155,10 @@ class RunAsCUDASubprocess:
 
         return cloudpickle.loads(fn)(*args)
 
-    def __call__(self, f):
+    def __call__(self, f: Callable) -> Callable:
         """Spawn a separate process to run wrapped TensorFlow function."""
 
-        def wrapped_f(*args):
+        def wrapped_f(*args: tuple) -> Any:
             """Wrap the function to run in a separate process."""
             import cloudpickle
             import multiprocessing as mp

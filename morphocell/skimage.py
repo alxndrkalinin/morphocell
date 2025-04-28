@@ -2,6 +2,7 @@
 
 from functools import wraps
 from types import ModuleType
+from typing import Callable, Any
 from importlib import import_module
 
 from .cuda import CUDAManager
@@ -10,19 +11,19 @@ from .cuda import CUDAManager
 class SkimageProxy(ModuleType):
     """Proxy module for dynamic wrapping of skimage functions for device awareness."""
 
-    _loaded_modules: dict = {}
+    _loaded_modules: dict[str, "SkimageProxy"] = {}
 
-    def __init__(self, name):
+    def __init__(self, name: str) -> None:
         """Initialize the proxy module."""
         super().__init__(name)
         self.cp = CUDAManager().get_cp()
 
-    def __getattr__(self, func_name):
+    def __getattr__(self, func_name: str) -> Callable:
         """Dynamically wrap skimage or cucim.skimage functions based on device capability."""
         if func_name in self.__dict__:
             return self.__dict__[func_name]
 
-        def func_wrapper(*args, **kwargs):
+        def func_wrapper(*args: Any, **kwargs: Any) -> Any:
             """Wrap skimage or cucim.skimage function based on device capability."""
             array = args[0] if args else kwargs.get("image", None)
             base_module = "skimage"
@@ -36,7 +37,7 @@ class SkimageProxy(ModuleType):
             func = getattr(module, method_name)
 
             @wraps(func)
-            def inner_func(*args, **kwargs):
+            def inner_func(*args: Any, **kwargs: Any) -> Any:
                 """Inner function to call the wrapped function."""
                 return func(*args, **kwargs)
 
@@ -46,13 +47,13 @@ class SkimageProxy(ModuleType):
         return func_wrapper
 
     @classmethod
-    def load_module(cls, name):
+    def load_module(cls, name: str) -> "SkimageProxy":
         """Load the module if not already loaded."""
         if name not in cls._loaded_modules:
             cls._loaded_modules[name] = SkimageProxy(name)
         return cls._loaded_modules[name]
 
 
-def __getattr__(name):
+def __getattr__(name: str) -> SkimageProxy:
     """Load skimage proxy module."""
     return SkimageProxy.load_module(name)

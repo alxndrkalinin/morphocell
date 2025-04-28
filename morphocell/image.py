@@ -1,9 +1,9 @@
 """Contains a simple class for storing image data."""
 
-from typing import Optional, Sequence
+from typing import Sequence, Any
 
-from .cuda import to_device, get_device
 from .skimage import util
+from .cuda import to_device, get_device
 
 
 class Image:
@@ -11,12 +11,12 @@ class Image:
 
     def __init__(
         self,
-        images,
-        spacing: Sequence,
-        filename: Optional[str] = None,
-        device: Optional[str] = None,
+        images: Any,
+        spacing: Sequence[float | int],
+        filename: str | None = None,
+        device: str | None = None,
         as_float: bool = True,
-    ):
+    ) -> None:
         """Create image object with data stored either as NumPy array (CPU) or CuPy array (GPU)."""
         if device is None:
             device = get_device(images)
@@ -33,12 +33,12 @@ class Image:
         self.filename = filename
         self.device = device
 
-    def to_gpu(self):
+    def to_gpu(self) -> None:
         """Move Image data to GPU."""
         self.data = to_device(self.data, "GPU")
         self.device = "GPU"
 
-    def to_cpu(self):
+    def to_cpu(self) -> None:
         """Move (or keep) Image on CPU."""
         self.data = to_device(self.data, "CPU")
         self.device = "CPU"
