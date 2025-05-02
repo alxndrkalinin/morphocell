@@ -1,19 +1,25 @@
 """Implements GPU-compatible metrics from scikit-image."""
 
-from typing import Optional
 from functools import wraps
+from typing import Callable, Any
 
-import numpy.typing as npt
+import numpy as np
 
 from ..skimage import metrics
 from ..cuda import check_same_device
 
 
-def scale_invariant(fn):
+def scale_invariant(fn: Callable) -> Callable:
     """Decorate a function to make it scale invariant."""
 
     @wraps(fn)
-    def wrapped(image_true, image_test, *args, scale_invariant=False, **kwargs):
+    def wrapped(
+        image_true: np.ndarray,
+        image_test: np.ndarray,
+        *args: Any,
+        scale_invariant: bool = False,
+        **kwargs: Any,
+    ) -> Any:
         """Transform input images to be scale invariant."""
         check_same_device(image_true, image_test)
         if not scale_invariant:
@@ -35,10 +41,10 @@ def scale_invariant(fn):
 
 @scale_invariant
 def nrmse(
-    image_true: npt.ArrayLike,
-    image_test: npt.ArrayLike,
-    normalization: Optional[str] = None,
-    data_range: Optional[float] = None,
+    image_true: np.ndarray,
+    image_test: np.ndarray,
+    normalization: str | None = None,
+    data_range: float | None = None,
 ):
     """Compute the normalized root mean squared error (NRMSE) between two images."""
     if data_range is not None:
@@ -54,9 +60,9 @@ def nrmse(
 
 @scale_invariant
 def psnr(
-    image_true: npt.ArrayLike,
-    image_test: npt.ArrayLike,
-    data_range: Optional[int] = None,
+    image_true: np.ndarray,
+    image_test: np.ndarray,
+    data_range: int | None = None,
 ):
     """Compute the peak signal to noise ratio (PSNR) between two images."""
     return metrics.peak_signal_noise_ratio(
@@ -66,14 +72,14 @@ def psnr(
 
 @scale_invariant
 def ssim(
-    im1: npt.ArrayLike,
-    im2: npt.ArrayLike,
-    win_size: Optional[int] = None,
-    gradient: Optional[bool] = False,
-    data_range: Optional[float] = None,
-    channel_axis: Optional[int] = None,
-    gaussian_weights: Optional[bool] = False,
-    full: Optional[bool] = False,
+    im1: np.ndarray,
+    im2: np.ndarray,
+    win_size: int | None = None,
+    gradient: bool | None = False,
+    data_range: float | None = None,
+    channel_axis: int | None = None,
+    gaussian_weights: bool | None = False,
+    full: bool | None = False,
     **kwargs,
 ):
     """Compute the mean structural similarity index between two images."""
