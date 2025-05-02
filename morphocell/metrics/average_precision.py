@@ -2,6 +2,9 @@
 
 Modified from StarDist/Cellpose with added support for CUDA GPUs by Alexandr Kalinin.
 
+Copyright (c) 2024 Alexandr Kalinin unless stated otherwise.
+
+For functions from Cellpose/Stardist, the original copyright is retained.
 Copyright (c) 2018-2024, Uwe Schmidt, Martin Weigert
 https://github.com/stardist/stardist/blob/586f8ca76d063bf3443f7a9a66fe94658bc155b8/stardist/matching.py#L45
 Copyright © 2023 Howard Hughes Medical Institute, Authored by Carsen Stringer and Marius Pachitariu.
@@ -14,33 +17,7 @@ from scipy.optimize import linear_sum_assignment
 from ..cuda import get_device, asnumpy, ascupy
 
 
-def _label_overlap_cpu(x, y):
-    """Measure label overlap on CPU using either NumPy or Numba if available.
-
-    Modified from: Copyright (c) 2018-2024, Uwe Schmidt, Martin Weigert
-    https://github.com/stardist/stardist/blob/586f8ca76d063bf3443f7a9a66fe94658bc155b8/stardist/matching.py#L45
-    """
-    x = x.ravel()
-    y = y.ravel()
-    overlap = np.zeros((1 + int(x.max()), 1 + int(y.max())), dtype=np.uint)
-
-    try:
-        from numba import jit
-
-        @jit(nopython=True)
-        def _numba_label_overlap(x, y, overlap):
-            for i in range(len(x)):
-                overlap[x[i], y[i]] += 1
-            return overlap
-
-        return _numba_label_overlap(x, y, overlap)
-    except ImportError:
-        print("Numba not available, using pure NumPy.")
-        np.add.at(overlap, (x, y), 1)
-        return overlap
-
-
-def _label_overlap_gpu(x, y):
+def _label_overlap_gpu(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     """Measure label overlap on GPU using CuPy.
 
     Copyright (c) 2024 Alexandr Kalinin
@@ -51,7 +28,7 @@ def _label_overlap_gpu(x, y):
     x = x.ravel()
     y = y.ravel()
     overlap = np.zeros((1 + int(x.max()), 1 + int(y.max())), dtype=np.uint)
-    overlap = ascupy(overlap)  # Convert overlap to CuPy array on GPU
+    overlap = ascupy(overlap)  # type: ignore[assignment]
 
     with warnings.catch_warnings():
         warnings.filterwarnings(
@@ -71,11 +48,36 @@ def _label_overlap_gpu(x, y):
     return overlap
 
 
-def _label_overlap(x, y):
-    """Route label overlap calculation based on the device.
+def _label_overlap_cpu(x: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """Measure label overlap on CPU using either NumPy or Numba if available.
 
-    Copyright (c) 2024 Alexandr Kalinin
+    Modified from: Copyright (c) 2018-2024, Uwe Schmidt, Martin Weigert
+    https://github.com/stardist/stardist/blob/586f8ca76d063bf3443f7a9a66fe94658bc155b8/stardist/matching.py#L45
     """
+    x = x.ravel()
+    y = y.ravel()
+    overlap = np.zeros((1 + int(x.max()), 1 + int(y.max())), dtype=np.uint)
+
+    try:
+        from numba import jit
+
+        @jit(nopython=True)
+        def _numba_label_overlap(
+            x: np.ndarray, y: np.ndarray, overlap: np.ndarray
+        ) -> np.ndarray:
+            for i in range(len(x)):
+                overlap[x[i], y[i]] += 1
+            return overlap
+
+        return _numba_label_overlap(x, y, overlap)
+    except ImportError:
+        print("Numba not available, using pure NumPy.")
+        np.add.at(overlap, (x, y), 1)
+        return overlap
+
+
+def _label_overlap(x: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """Route label overlap calculation based on the device."""
     device_x = get_device(x)
     device_y = get_device(y)
 
@@ -93,7 +95,9 @@ def _label_overlap(x, y):
         return _label_overlap_cpu(x, y)
 
 
-def _intersection_over_union(masks_true, masks_pred):
+def _intersection_over_union(
+    masks_true: np.ndarray, masks_pred: np.ndarray
+) -> np.ndarray:
     """Calculate the intersection over union of all mask pairs, device agnostic.
 
     Modified from: Copyright © 2023 Howard Hughes Medical Institute, Authored by Carsen Stringer and Marius Pachitariu.
@@ -109,7 +113,7 @@ def _intersection_over_union(masks_true, masks_pred):
     return iou
 
 
-def _matches_at_threshold(iou, th):
+def _matches_at_threshold(iou: np.ndarray, th: float) -> tuple[np.ndarray, np.ndarray]:
     """Identify matches based on IoU and threshold.
 
     Modified from: Copyright © 2023 Howard Hughes Medical Institute, Authored by Carsen Stringer and Marius Pachitariu.
@@ -126,7 +130,15 @@ def _matches_at_threshold(iou, th):
     return true_ind[match_ok], pred_ind[match_ok]
 
 
-def compute_matches(mask_true, mask_pred, thresholds, return_iou=False):
+def compute_matches(
+    mask_true: np.ndarray,
+    mask_pred: np.ndarray,
+    thresholds: list[float] | np.ndarray,
+    return_iou: bool = False,
+) -> (
+    dict[float, tuple[np.ndarray, np.ndarray]]
+    | tuple[dict[float, tuple[np.ndarray, np.ndarray]], np.ndarray]
+):
     """Compute and store IoU and matching indices for various thresholds.
 
     Modified from: Copyright © 2023 Howard Hughes Medical Institute, Authored by Carsen Stringer and Marius Pachitariu.
@@ -141,7 +153,12 @@ def compute_matches(mask_true, mask_pred, thresholds, return_iou=False):
     return (matches, iou) if return_iou else matches
 
 
-def average_precision(masks_true, masks_pred, thresholds, matches_per_threshold=None):
+def average_precision(
+    masks_true: np.ndarray,
+    masks_pred: np.ndarray,
+    thresholds: list[float] | np.ndarray,
+    matches_per_threshold: dict[float, tuple[np.ndarray, np.ndarray]] | None = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Calculate average precision and other metrics for a single pair of mask images with pre-computed matches.
 
     Modified from: Copyright © 2023 Howard Hughes Medical Institute, Authored by Carsen Stringer and Marius Pachitariu.
@@ -151,8 +168,9 @@ def average_precision(masks_true, masks_pred, thresholds, matches_per_threshold=
     https://github.com/stardist/stardist/blob/586f8ca76d063bf3443f7a9a66fe94658bc155b8/stardist/matching.py#L109
     """
     if matches_per_threshold is None:
-        matches_per_threshold = compute_matches(masks_true, masks_pred, thresholds)
+        matches_per_threshold = compute_matches(masks_true, masks_pred, thresholds)  # type: ignore[assignment]
 
+    assert matches_per_threshold is not None, "No matches found."
     tp = np.asarray([len(matches_per_threshold[th][0]) for th in thresholds])
     fp = asnumpy(masks_pred.max()) - tp
     fn = asnumpy(masks_true.max()) - tp
