@@ -6,8 +6,9 @@ https://github.com/rapidsai/cucim/issues/241
 
 import numpy as np
 
-from .average_precision import compute_matches
-from ..feature.voxel import extract_features, norm_features_by_range
+from morphocell.cuda import to_same_device
+from morphocell.metrics.average_precision import compute_matches
+from morphocell.feature.voxel import extract_features, norm_features_by_range
 
 
 def _calculate_cosine(true_features: np.ndarray, pred_features: np.ndarray) -> float:
@@ -51,13 +52,10 @@ def get_true_features(
         true_labels = gt_feature_dict["label"]
 
         if not feature_ranges:
-            feature_ranges = {
-                feat: (
-                    gt_feature_dict[feat].min(),
-                    gt_feature_dict[feat].max(),
-                )
-                for feat in numeric_features
-            }
+            feature_ranges = {}
+            for feat in numeric_features:
+                arr = gt_feature_dict[feat]
+                feature_ranges[feat] = (arr.min(), arr.max())
             true_features = np.stack(
                 [gt_feature_dict[f] for f in numeric_features], axis=1
             )
@@ -94,6 +92,8 @@ def cosine_median(
     pred_labels, pred_features = extract_features(
         label_image_pred, features, feature_ranges
     )
+    true_features = to_same_device(true_features, pred_features)
+    true_labels = to_same_device(true_labels, pred_labels)
     true_features, pred_features = filter_nan_features(true_features, pred_features)
 
     if thresholds is None:
@@ -109,12 +109,15 @@ def cosine_median(
     distances = {}
     for th in thresholds:
         true_ind, pred_ind = matches_per_threshold[th]  # type: ignore
-        filtered_true_feats = true_features[np.isin(true_labels, true_ind)]
-        filtered_pred_feats = pred_features[np.isin(pred_labels, pred_ind)]
-        distances[th] = _calculate_cosine(
-            np.median(filtered_true_feats, axis=0),
-            np.median(filtered_pred_feats, axis=0),
-        )
+        if true_ind.size and pred_ind.size:
+            true_ind = to_same_device(true_ind, true_labels)
+            pred_ind = to_same_device(pred_ind, pred_labels)
+            distances[th] = _calculate_cosine(
+                np.median(true_features[np.isin(true_labels, true_ind)], axis=0),
+                np.median(pred_features[np.isin(pred_labels, pred_ind)], axis=0),
+            )
+        else:
+            distances[th] = np.nan
 
     if not return_features:
         return distances
