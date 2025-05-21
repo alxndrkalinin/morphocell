@@ -7,7 +7,7 @@ name = "morphocell"
 dynamic = ["version"]
 description = "Morphometric analysis of nD bioimages with CUDA support"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
     { name = "Alexandr Kalinin", email = "alxndrkalinin@gmail.com" }
