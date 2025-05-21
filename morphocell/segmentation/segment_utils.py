@@ -39,9 +39,10 @@ def downscale_and_filter(
     """
     # cuCIM does not yet support rank-based median filter
     # https://github.com/rapidsai/cucim/blob/main/python/cucim/src/cucim/skimage/filters/_median.py#L124
-    assert filter_shape in ["square", "circular"], (
-        "Filter shape must be 'square' or 'circular'."
-    )
+    assert filter_shape in [
+        "square",
+        "circular",
+    ], "Filter shape must be 'square' or 'circular'."
 
     if image.ndim == 2:
         skimage_footprint = (
