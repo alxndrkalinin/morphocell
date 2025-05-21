@@ -17,6 +17,11 @@ from scipy.optimize import linear_sum_assignment
 from ..cuda import get_device, asnumpy, ascupy
 
 
+def _check_sequential_labels(mask: np.ndarray) -> bool:
+    labels = np.unique(mask)
+    return bool((labels[0] == 0) and np.all(np.diff(labels) == 1))
+
+
 def _label_overlap_gpu(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     """Measure label overlap on GPU using CuPy.
 
@@ -147,9 +152,18 @@ def compute_matches(
     , which was modified from: Copyright (c) 2018-2024, Uwe Schmidt, Martin Weigert
     https://github.com/stardist/stardist/blob/586f8ca76d063bf3443f7a9a66fe94658bc155b8/stardist/matching.py#L109
     """
+    assert _check_sequential_labels(mask_true), (
+        "mask_true should have sequential labels."
+    )
+    assert _check_sequential_labels(mask_pred), (
+        "mask_pred should have sequential labels."
+    )
     iou = _intersection_over_union(mask_true, mask_pred)[1:, 1:]
     iou = np.nan_to_num(asnumpy(iou))
-    matches = {th: _matches_at_threshold(iou, th) for th in thresholds}
+    matches = {}
+    for th in thresholds:
+        th_matches = _matches_at_threshold(iou, th)
+        matches[th] = (th_matches[0] + 1, th_matches[1] + 1)
     return (matches, iou) if return_iou else matches
 
 
