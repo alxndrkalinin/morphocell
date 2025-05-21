@@ -1,8 +1,4 @@
-"""Calculate feature-based metrics for morphology comparison.
-
-Only matching currently supports GPU, regionprops are forced to execute CPU, see:
-https://github.com/rapidsai/cucim/issues/241
-"""
+"""Calculate feature-based metrics for morphology comparison."""
 
 import numpy as np
 
@@ -37,12 +33,14 @@ def get_true_features(
     """Extract or retrieve true features based on precomputed or provided label images."""
     if gt_feature_dict:
         gt_features = gt_feature_dict.keys()
-        numeric_features = [feat for feat in gt_features if feat != "label"]
+        numeric_features = sorted([feat for feat in gt_features if feat != "label"])
         assert "label" in gt_features, "Label column not found in precomputed features."
 
         if not features:
-            features = list(
-                set([feat.split("-")[0] for feat in gt_features if feat != "label"])
+            features = sorted(
+                list(
+                    set([feat.split("-")[0] for feat in gt_features if feat != "label"])
+                )
             )
         else:
             assert all(feat in gt_features for feat in features if feat != "label"), (

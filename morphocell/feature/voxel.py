@@ -44,11 +44,13 @@ def extract_features(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Extract features from a label image using regionprops."""
     image_props = regionprops_table(label_image, properties=features)
-    selected_features = [
-        feat
-        for feat in image_props.keys()
-        if feat != "label" and feat.split("-")[0] in features
-    ]
+    selected_features = sorted(
+        [
+            feat
+            for feat in image_props.keys()
+            if feat != "label" and feat.split("-")[0] in features
+        ]
+    )
     feature_values = np.column_stack([image_props[feat] for feat in selected_features])
     if feature_ranges is not None:
         assert all(feature in feature_ranges for feature in selected_features), (
