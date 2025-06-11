@@ -29,8 +29,13 @@ def cellpose_eval(
     do_3D: bool = True,
 ) -> npt.ArrayLike:
     """Run pre-trained Cellpose model and return masks."""
-    model = models.Cellpose(gpu=True, model_type="cyto", omni=False)
-    masks, _, _, _ = model.eval(image, channels=channels, diameter=diameter, do_3D=True)
+    model = models.Cellpose(gpu=True, model_type=model_type, omni=omni)
+    masks, _, _, _ = model.eval(
+        image,
+        channels=channels,
+        diameter=diameter,
+        do_3D=do_3D,
+    )
     return masks
 
 
