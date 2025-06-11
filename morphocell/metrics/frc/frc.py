@@ -13,10 +13,9 @@ from miplib.data.containers.fourier_correlation_data import (
 import miplib.analysis.resolution.analysis as fsc_analysis
 import miplib.ui.cli.miplib_entry_point_options as options
 
-from ..image import Image
-from ..cuda import asnumpy, get_array_module
-from ..image_utils import (
-    max_project,
+from ...image import Image
+from ...cuda import asnumpy, get_array_module
+from ...image_utils import (
     crop_tl,
     crop_bl,
     crop_tr,
@@ -549,7 +548,7 @@ def grid_crop_resolution(
     for y1, y2, x1, x2 in locations:
         loc_image = image.data[:, y1:y2, x1:x2]
         max_projection_resolution = calculate_frc(
-            max_project(loc_image),
+            loc_image.max(0),
             bin_delta=bin_delta,
             scales=scales_xy,
             return_resolution=return_resolution,
@@ -634,7 +633,7 @@ def five_crop_resolution(
         loc_image = loc(image, crop_size)  # type: ignore
 
         max_projection_resolution = calculate_frc(
-            max_project(loc_image),
+            loc_image.max(0),
             bin_delta=bin_delta,
             scales=scales_xy,
             return_resolution=return_resolution,
