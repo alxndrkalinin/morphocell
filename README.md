@@ -1,11 +1,11 @@
-# MorphoCell
+# morphocell
 
-MorphoCell is a Python library for morphomeric analysis of 3D cell images.
+morphoCell is a Python library for morphometric analysis of multidimensional bioimages with CUDA support.
 
 ## Installation
 
 Tested with:
-* Python 3.9-11
+* Python >=3.10
 * Ubuntu 18.04
 * CUDA 11.2-12.1
 
