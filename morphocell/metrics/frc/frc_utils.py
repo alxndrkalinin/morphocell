@@ -62,8 +62,33 @@ import scipy.optimize as optimize
 from scipy.interpolate import interp1d, UnivariateSpline
 
 from morphocell.skimage import exposure
-import miplib.processing.itk as itkutils
+from . import itk as itkutils
+from argparse import Namespace
 
+
+def get_frc_options(
+    bin_delta: int = 1,
+    angle_delta: int = 15,
+    extract_angle_delta: float = 0.1,
+    resolution_threshold: str = "fixed",
+    curve_fit_type: str = "spline",
+    disable_hamming: bool = False,
+    verbose: bool = False,
+) -> Namespace:
+    """Return a :class:`argparse.Namespace` with common FRC/FSC parameters."""
+
+    return Namespace(
+        d_bin=bin_delta,
+        d_angle=angle_delta,
+        d_extract_angle=extract_angle_delta,
+        disable_hamming=disable_hamming,
+        resolution_threshold_criterion=resolution_threshold,
+        resolution_threshold_value=0.143,
+        resolution_snr_value=7.0,
+        frc_curve_fit_degree=3,
+        frc_curve_fit_type=curve_fit_type,
+        verbose=verbose,
+    )
 
 class FixedDictionary(object):
     """
