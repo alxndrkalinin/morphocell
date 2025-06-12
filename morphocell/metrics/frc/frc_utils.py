@@ -90,6 +90,7 @@ def get_frc_options(
         verbose=verbose,
     )
 
+
 class FixedDictionary(object):
     """
     A dictionary with immutable keys. Is initialized at construction

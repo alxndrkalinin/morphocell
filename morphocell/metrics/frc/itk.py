@@ -18,7 +18,11 @@ def convert_from_itk_image(image: np.ndarray) -> np.ndarray:
     return np.asarray(image)
 
 
-def rotate_image(image: np.ndarray, angle: float, interpolation: str = "nearest") -> np.ndarray:
+def rotate_image(
+    image: np.ndarray, angle: float, interpolation: str = "nearest"
+) -> np.ndarray:
     """Rotate 3D image around the Z axis by ``angle`` degrees."""
     order = 1 if interpolation == "linear" else 0
-    return rotate(image, angle, axes=(1, 2), reshape=False, order=order, mode="constant")
+    return rotate(
+        image, angle, axes=(1, 2), reshape=False, order=order, mode="constant"
+    )

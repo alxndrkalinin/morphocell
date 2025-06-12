@@ -167,9 +167,7 @@ def calculate_single_image_frc(
     params = [0.95988146, 0.97979108, 13.90441896, 0.55146136]
 
     # Analyze results
-    analyzer = FourierCorrelationAnalysis(
-        frc_data, image1.spacing[0], args
-    )
+    analyzer = FourierCorrelationAnalysis(frc_data, image1.spacing[0], args)
 
     result = analyzer.execute(z_correction=z_correction)[0]
     point = result.resolution["resolution-point"][1]
