@@ -104,8 +104,7 @@ class FixedDictionary(object):
     def __setitem__(self, key, value):
         if key not in self._dictionary:
             raise KeyError(f"The key {key} is not defined")
-        else:
-            self._dictionary[key] = value
+        self._dictionary[key] = value
 
     def __getitem__(self, key):
         return self._dictionary[key]
@@ -179,8 +178,8 @@ def cast_to_dtype(data, dtype, rescale=True, remove_outliers=False):
 
     if rescale is True:
         return rescale_to_min_max(data, data_min, data_max).astype(dtype)
-    else:
-        return data.clip(data_min, data_max).astype(dtype)
+
+    return data.clip(data_min, data_max).astype(dtype)
 
 
 def rescale_to_min_max(data, data_min, data_max):
@@ -213,28 +212,39 @@ def expand_to_shape(data, shape, dtype=None, background=None):
     if background is None:
         background = 0
 
-    if tuple(shape) != data.shape:
-        expanded_data = np.zeros(shape, dtype=dtype) + background
-        slices = []
-        rhs_slices = []
-        for s1, s2 in zip(shape, data.shape):
-            a, b = (s1 - s2 + 1) // 2, (s1 + s2 + 1) // 2
-            c, d = 0, s2
-            while a < 0:
-                a += 1
-                b -= 1
-                c += 1
-                d -= 1
-            slices.append(slice(a, b))
-            rhs_slices.append(slice(c, d))
-        try:
-            expanded_data[tuple(slices)] = data[tuple(rhs_slices)]
-        except ValueError:
-            print(data.shape, shape)
-            raise
-        return expanded_data
-    else:
+    if tuple(shape) == data.shape:
         return data
+
+    expanded_data = np.zeros(shape, dtype=dtype) + background
+    slices = []
+    rhs_slices = []
+    for s1, s2 in zip(shape, data.shape):
+        a, b = (s1 - s2 + 1) // 2, (s1 + s2 + 1) // 2
+        c, d = 0, s2
+        while a < 0:
+            a += 1
+            b -= 1
+            c += 1
+            d -= 1
+        slices.append(slice(a, b))
+        rhs_slices.append(slice(c, d))
+    try:
+        expanded_data[tuple(slices)] = data[tuple(rhs_slices)]
+    except ValueError as exc:
+        print(data.shape, shape)
+        raise ValueError("Failed to expand data to the requested shape") from exc
+    return expanded_data
+
+
+def _angle_mask(phi, phi_min, phi_max):
+    """Return a boolean mask for an angular sector."""
+    arr_inf = phi >= phi_min
+    arr_sup = phi < phi_max
+
+    arr_inf_neg = phi >= phi_min + np.pi
+    arr_sup_neg = phi < phi_max + np.pi
+
+    return arr_inf * arr_sup + arr_inf_neg * arr_sup_neg
 
 
 class FourierRingIterator(object):
@@ -346,13 +356,7 @@ class SectionedFourierRingIterator(FourierRingIterator):
         :return:
 
         """
-        arr_inf = self.phi >= phi_min
-        arr_sup = self.phi < phi_max
-
-        arr_inf_neg = self.phi >= phi_min + np.pi
-        arr_sup_neg = self.phi < phi_max + np.pi
-
-        return arr_inf * arr_sup + arr_inf_neg * arr_sup_neg
+        return _angle_mask(self.phi, phi_min, phi_max)
 
     def __getitem__(self, limits):
         """
@@ -498,13 +502,7 @@ class SectionedFourierShellIterator(FourierShellIterator):
         :return:
 
         """
-        arr_inf = self.phi >= phi_min
-        arr_sup = self.phi < phi_max
-
-        arr_inf_neg = self.phi >= phi_min + np.pi
-        arr_sup_neg = self.phi < phi_max + np.pi
-
-        return arr_inf * arr_sup + arr_inf_neg * arr_sup_neg
+        return _angle_mask(self.phi, phi_min, phi_max)
 
     def __getitem__(self, limits):
         """
@@ -581,26 +579,14 @@ class HollowSectionedFourierShellIterator(SectionedFourierShellIterator):
 
         """
         # Calculate angular sector
-        arr_inf = self.phi >= phi_min
-        arr_sup = self.phi < phi_max
-
-        arr_inf_neg = self.phi >= phi_min + np.pi
-        arr_sup_neg = self.phi < phi_max + np.pi
-
-        full_section = arr_inf * arr_sup + arr_inf_neg * arr_sup_neg
+        full_section = _angle_mask(self.phi, phi_min, phi_max)
 
         # Calculate part of the section to exclude
         sector_center = phi_min + (phi_max - phi_min) / 2
         phi_min_ext = sector_center - self.d_extract_angle
         phi_max_ext = sector_center + self.d_extract_angle
 
-        arr_inf_ext = self.phi >= phi_min_ext
-        arr_sup_ext = self.phi < phi_max_ext
-
-        arr_inf_neg_ext = self.phi >= phi_min_ext + np.pi
-        arr_sup_neg_ext = self.phi < phi_max_ext + np.pi
-
-        extract_section = arr_inf_ext * arr_sup_ext + arr_inf_neg_ext * arr_sup_neg_ext
+        extract_section = _angle_mask(self.phi, phi_min_ext, phi_max_ext)
 
         return np.logical_xor(full_section, extract_section)
 
@@ -632,13 +618,7 @@ class AxialExcludeSectionedFourierShellIterator(HollowSectionedFourierShellItera
 
         """
         # Calculate angular sector
-        arr_inf = self.phi >= phi_min
-        arr_sup = self.phi < phi_max
-
-        arr_inf_neg = self.phi >= phi_min + np.pi
-        arr_sup_neg = self.phi < phi_max + np.pi
-
-        full_section = arr_inf * arr_sup + arr_inf_neg * arr_sup_neg
+        full_section = _angle_mask(self.phi, phi_min, phi_max)
 
         axis_pos = np.deg2rad(90) + self.d_angle / 2
         axis_neg = np.deg2rad(270) + self.d_angle / 2
@@ -655,13 +635,7 @@ class AxialExcludeSectionedFourierShellIterator(HollowSectionedFourierShellItera
         else:
             return full_section
 
-        arr_inf_ext = self.phi >= phi_min_ext
-        arr_sup_ext = self.phi < phi_max_ext
-
-        arr_inf_neg_ext = self.phi >= phi_min_ext + np.pi
-        arr_sup_neg_ext = self.phi < phi_max_ext + np.pi
-
-        extract_section = arr_inf_ext * arr_sup_ext + arr_inf_neg_ext * arr_sup_neg_ext
+        extract_section = _angle_mask(self.phi, phi_min_ext, phi_max_ext)
 
         return np.logical_xor(full_section, extract_section)
 
@@ -1022,59 +996,18 @@ class FourierCorrelationAnalysis(object):
         fit_type = self.args.frc_curve_fit_type
         verbose = self.args.verbose
 
-        def pdiff1(x):
-            return abs(frc_eq(x) - two_sigma_eq(x))
-
-        def pdiff2(x):
-            return abs(frc_eq(x) - threshold)
-
-        def first_guess(x, y, threshold):
-            # y_smooth = savgol_filter(y, 5, 2)
-            # return x[np.argmin(np.abs(y_smooth - threshold))]
-
-            difference = y - threshold
-
-            return x[np.where(difference <= 0)[0][0] - 1]
-            # return x[np.argmin(np.abs(y - threshold))]
-
         for key, data_set in self.data_collection:
-            if verbose:
-                print("Calculating resolution point for dataset {}".format(key))
-            frc_eq = fit_frc_curve(data_set, degree, fit_type)
-            two_sigma_eq = calculate_resolution_threshold_curve(
-                data_set, criterion, threshold, snr
+            self.data_collection[int(key)] = self._process_dataset(
+                key,
+                data_set,
+                degree,
+                fit_type,
+                criterion,
+                threshold,
+                snr,
+                z_correction,
+                verbose,
             )
-
-            """
-            Todo: Make the first quess adaptive. For example find the data point at which FRC
-            value is closest to the mean of the threshold
-            """
-
-            # Find intersection
-            fit_start = first_guess(
-                data_set.correlation["frequency"],
-                data_set.correlation["correlation"],
-                np.mean(data_set.resolution["threshold"]),
-            )
-            if self.args.verbose:
-                print("Fit starts at {}".format(fit_start))
-                disp = 1
-            else:
-                disp = 0
-            root = optimize.fmin(
-                pdiff2 if criterion == "fixed" else pdiff1, fit_start, disp=disp
-            )[0]
-            data_set.resolution["resolution-point"] = (frc_eq(root), root)
-            data_set.resolution["criterion"] = criterion
-
-            angle = np.deg2rad(int(key))
-            z_correction_multiplier = 1 + (z_correction - 1) * np.abs(np.sin(angle))
-            resolution = z_correction_multiplier * (2 * self.spacing / root)
-
-            data_set.resolution["resolution"] = resolution
-            data_set.resolution["spacing"] = self.spacing * z_correction_multiplier
-
-            self.data_collection[int(key)] = data_set
 
             # # # Find intersection
             # root, result = optimize.brentq(
@@ -1092,3 +1025,59 @@ class FourierCorrelationAnalysis(object):
             #     print "Could not find an intersection for the curves for the dataset %s." % key
 
         return self.data_collection
+
+    def _process_dataset(
+        self,
+        key,
+        data_set,
+        degree,
+        fit_type,
+        criterion,
+        threshold,
+        snr,
+        z_correction,
+        verbose,
+    ):
+        if verbose:
+            print(f"Calculating resolution point for dataset {key}")
+
+        frc_eq = fit_frc_curve(data_set, degree, fit_type)
+        two_sigma_eq = calculate_resolution_threshold_curve(
+            data_set, criterion, threshold, snr
+        )
+
+        def pdiff1(x):
+            return abs(frc_eq(x) - two_sigma_eq(x))
+
+        def pdiff2(x):
+            return abs(frc_eq(x) - threshold)
+
+        def first_guess(x, y, thr):
+            difference = y - thr
+            return x[np.where(difference <= 0)[0][0] - 1]
+
+        fit_start = first_guess(
+            data_set.correlation["frequency"],
+            data_set.correlation["correlation"],
+            np.mean(data_set.resolution["threshold"]),
+        )
+        if verbose:
+            print(f"Fit starts at {fit_start}")
+            disp = 1
+        else:
+            disp = 0
+        root = optimize.fmin(
+            pdiff2 if criterion == "fixed" else pdiff1, fit_start, disp=disp
+        )[0]
+
+        data_set.resolution["resolution-point"] = (frc_eq(root), root)
+        data_set.resolution["criterion"] = criterion
+
+        angle = np.deg2rad(int(key))
+        z_multiplier = 1 + (z_correction - 1) * np.abs(np.sin(angle))
+        resolution = z_multiplier * (2 * self.spacing / root)
+
+        data_set.resolution["resolution"] = resolution
+        data_set.resolution["spacing"] = self.spacing * z_multiplier
+
+        return data_set
