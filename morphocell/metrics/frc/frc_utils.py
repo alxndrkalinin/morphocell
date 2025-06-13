@@ -103,7 +103,7 @@ class FixedDictionary(object):
 
     def __setitem__(self, key, value):
         if key not in self._dictionary:
-            raise KeyError("The key {} is not defined".format(key))
+            raise KeyError(f"The key {key} is not defined")
         else:
             self._dictionary[key] = value
 
