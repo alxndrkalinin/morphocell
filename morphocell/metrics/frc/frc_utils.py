@@ -62,7 +62,7 @@ import scipy.optimize as optimize
 from scipy.interpolate import interp1d, UnivariateSpline
 
 from morphocell.skimage import exposure
-from . import itk as itkutils
+from morphocell.image_utils import rotate_image
 from argparse import Namespace
 
 
@@ -695,7 +695,7 @@ class RotatingFourierShellIterator(FourierShellIterator):
 
         plane = expand_to_shape(np.ones((1, shape[1], shape[2])), shape)
 
-        self.plane = itkutils.convert_from_numpy(plane, (1, 1, 1))
+        self.plane = plane
 
         self.rotated_plane = plane > 0
 
@@ -718,9 +718,7 @@ class RotatingFourierShellIterator(FourierShellIterator):
         :param angle:
         """
         (shell_start, shell_stop, angle) = limits
-        rotated_plane = itkutils.convert_from_itk_image(
-            itkutils.rotate_image(self.plane, angle)
-        )
+        rotated_plane = rotate_image(self.plane, angle)
 
         points_on_plane = rotated_plane > 0
         points_on_shell = self.get_points_on_shell(shell_start, shell_stop)
@@ -738,10 +736,8 @@ class RotatingFourierShellIterator(FourierShellIterator):
             self.current_shell += 1
 
         elif rotation_idx <= self.rotation_stop:
-            rotated_plane = itkutils.convert_from_itk_image(
-                itkutils.rotate_image(
-                    self.plane, self.angles[rotation_idx], interpolation="linear"
-                )
+            rotated_plane = rotate_image(
+                self.plane, self.angles[rotation_idx], interpolation="linear"
             )
 
             self.rotated_plane = rotated_plane > 0
