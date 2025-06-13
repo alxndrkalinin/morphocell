@@ -325,6 +325,19 @@ def crop_to_divisor(
         )
 
 
+def rotate_image(
+    image: np.ndarray, angle: float, interpolation: str = "nearest"
+) -> np.ndarray:
+    """Rotate 3D image around the Z axis by ``angle`` degrees."""
+    xp = get_array_module(image)
+    order = 1 if interpolation == "linear" else 0
+    if xp.__name__ == np.__name__:
+        from scipy.ndimage import rotate
+    else:
+        from cupyx.scipy.ndimage import rotate  # type: ignore
+    return rotate(image, angle, axes=(1, 2), reshape=False, order=order, mode="constant")
+
+
 def get_xy_block_coords(
     image_shape: Sequence[int], crop_hw: int | tuple[int, int]
 ) -> npt.ArrayLike:
