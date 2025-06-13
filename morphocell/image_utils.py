@@ -335,7 +335,9 @@ def rotate_image(
         from scipy.ndimage import rotate
     else:
         from cupyx.scipy.ndimage import rotate  # type: ignore
-    return rotate(image, angle, axes=(1, 2), reshape=False, order=order, mode="constant")
+    return rotate(
+        image, angle, axes=(1, 2), reshape=False, order=order, mode="constant"
+    )
 
 
 def get_xy_block_coords(
