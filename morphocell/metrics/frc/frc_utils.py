@@ -98,7 +98,7 @@ class FixedDictionary(object):
     """
 
     def __init__(self, keys):
-        assert isinstance(keys, list) or isinstance(keys, tuple)
+        assert isinstance(keys, (list, tuple))
         self._dictionary = dict.fromkeys(keys)
 
     def __setitem__(self, key, value):
