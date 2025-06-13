@@ -761,7 +761,7 @@ class FourierCorrelationDataCollection(object):
     """
 
     def __init__(self):
-        self._data = dict()
+        self._data = {}
 
         self.iter_index = 0
 
