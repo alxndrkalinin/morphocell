@@ -30,7 +30,7 @@ try:
 except Exception:
     _IS_XVBF_AVAILABLE = False
     warnings.warn(
-        "pyvirtualdisplay is not available. DeconcolutionLab2 deconvolution will not work."
+        "pyvirtualdisplay is not available. DeconvolutionLab2 deconvolution will not work."
     )
 
 
@@ -47,11 +47,11 @@ def richardson_lucy_dl2(
     image: Union[str, npt.ArrayLike],
     psf: Union[str, npt.ArrayLike],
     n_iter: int = 10,
-    dl2_path: str = "DeconcolutionLab2_-0.1.0-SNAPSHOT-jar-with-dependencies.jar",
+    dl2_path: str = "DeconvolutionLab2-0.1.0-SNAPSHOT-jar-with-dependencies.jar",
     tmp_dir: Union[Path, Optional[str]] = None,
     verbose: bool = False,
 ) -> Union[int, np.ndarray]:
-    """Perform GPU-accelerated (optional) Lucy-Richardson deconvolution using DeconvoltuionLab2."""
+    """Perform GPU-accelerated (optional) Lucy-Richardson deconvolution using DeconvolutionLab2."""
     verboseprint = print if verbose else lambda *a, **k: None
 
     if not _IS_XVBF_AVAILABLE:
@@ -228,7 +228,7 @@ def decon_iter_num_finder(
     verbose: bool = False,
     subprocess_cuda: bool = False,
 ) -> Tuple[int, List[Dict[str, Union[int, float, np.ndarray]]]]:
-    """Find numer of LR decon iterations using image similarity metric."""
+    """Find number of LR deconvolution iterations using an image similarity metric."""
     check_tf_available()
     verboseprint = print if verbose else lambda *a, **k: None
 
