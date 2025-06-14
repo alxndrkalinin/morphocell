@@ -217,7 +217,7 @@ def decon_flowdec(
     return fl_decon_image.astype(np.uint16)
 
 
-def decon_iter_num_finder(
+def deconv_iter_num_finder(
     image: Union[str, npt.ArrayLike],
     psf: Union[str, npt.ArrayLike],
     metric_fn: Callable,
