@@ -21,8 +21,11 @@ def cells_volume() -> np.ndarray:
     return volume[:, 1]
 
 
+CUDA_MANAGER = CUDAManager()
+
+
 def _gpu_available() -> bool:
-    return CUDAManager().get_num_gpus() > 0
+    return CUDA_MANAGER.get_num_gpus() > 0
 
 
 def _middle_slice(volume: np.ndarray) -> np.ndarray:
