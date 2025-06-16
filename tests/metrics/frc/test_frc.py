@@ -21,11 +21,10 @@ def cells_volume() -> np.ndarray:
     return volume[:, 1]
 
 
-CUDA_MANAGER = CUDAManager()
-
-
 def _gpu_available() -> bool:
-    return CUDA_MANAGER.get_num_gpus() > 0
+    if not hasattr(_gpu_available, "_cached"):
+        _gpu_available._cached = CUDAManager().get_num_gpus() > 0  # type: ignore[attr-defined]
+    return _gpu_available._cached  # type: ignore[attr-defined]
 
 
 def _middle_slice(volume: np.ndarray) -> np.ndarray:
