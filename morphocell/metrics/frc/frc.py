@@ -1,21 +1,14 @@
 """Implements 2D/3D Fourier Ring/Shell Correlation."""
 
-from typing import Union, Sequence, Callable, Dict, Optional, Tuple, Any
-import numpy.typing as npt
 from argparse import Namespace
+from typing import Union, Sequence, Callable, Dict, Optional, Tuple, Any
 
-from .frc_utils import (
-    FourierRingIterator,
-    AxialExcludeSectionedFourierShellIterator,
-    FourierCorrelationData,
-    FourierCorrelationDataCollection,
-    FourierCorrelationAnalysis,
-    get_frc_options,
-)
+import numpy as np
+import numpy.typing as npt
 
-from ...image import Image
-from ...cuda import asnumpy, get_array_module
-from ...image_utils import (
+from morphocell.image import Image
+from morphocell.cuda import asnumpy, get_array_module
+from morphocell.image_utils import (
     crop_tl,
     crop_bl,
     crop_tr,
@@ -31,7 +24,14 @@ from ...image_utils import (
     reverse_checkerboard_split,
 )
 
-import numpy as np
+from .frc_utils import (
+    FourierRingIterator,
+    AxialExcludeSectionedFourierShellIterator,
+    FourierCorrelationData,
+    FourierCorrelationDataCollection,
+    FourierCorrelationAnalysis,
+    get_frc_options,
+)
 
 
 def _empty_aggregate(*args: npt.ArrayLike, **kwargs) -> npt.ArrayLike:
