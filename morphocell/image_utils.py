@@ -342,7 +342,7 @@ def rotate_image(
 
 def get_xy_block_coords(
     image_shape: Sequence[int], crop_hw: int | tuple[int, int]
-) -> npt.ArrayLike:
+) -> np.ndarray:
     """Compute coordinates of non-overlapping image blocks of specified shape."""
     crop_h, crop_w = (crop_hw, crop_hw) if isinstance(crop_hw, int) else crop_hw
     height, width = image_shape[1:]
