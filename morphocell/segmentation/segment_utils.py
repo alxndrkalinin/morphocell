@@ -44,11 +44,13 @@ def downscale_and_filter(
         "circular",
     ], "Filter shape must be 'square' or 'circular'."
 
-    if image.ndim == 2:
+    image_np = np.asarray(image)
+
+    if image_np.ndim == 2:
         skimage_footprint = (
             morphology.square if filter_shape == "square" else morphology.disk
         )
-    elif image.ndim == 3:
+    elif image_np.ndim == 3:
         skimage_footprint = (
             morphology.cube if filter_shape == "square" else morphology.ball
         )
@@ -56,9 +58,11 @@ def downscale_and_filter(
         raise ValueError("Image must be 2D or 3D.")
 
     if downscale_factor < 1.0:
-        image = transform.rescale(image, downscale_factor, order=3, anti_aliasing=True)
+        image_np = transform.rescale(
+            image_np, downscale_factor, order=3, anti_aliasing=True
+        )
 
-    return filters.median(image, footprint=skimage_footprint(filter_size))
+    return filters.median(image_np, footprint=skimage_footprint(filter_size))
 
 
 def check_labeled_binary(image):
@@ -92,31 +96,30 @@ def cleanup_segmentation(
     max_hole_size: Optional[int] = None,
 ) -> npt.ArrayLike:
     """Clean up segmented image by removing small objects, clearing borders, and closing holes."""
-    check_labeled_binary(label_image)
+    label_img = np.asarray(label_image)
+    check_labeled_binary(label_img)
 
     # first 3 transforms preserve labels
     if min_obj_size is not None:
         # min_obj_size = to_device(min_obj_size, get_device(label_image))
-        label_image = morphology.remove_small_objects(
-            label_image, min_size=min_obj_size
-        )
+        label_img = morphology.remove_small_objects(label_img, min_size=min_obj_size)
 
     if max_obj_size is not None:
-        label_image = remove_large_objects(label_image, max_size=max_obj_size)
+        label_img = remove_large_objects(label_img, max_size=max_obj_size)
 
     if border_buffer_size is not None:
-        label_image = clear_xy_borders(label_image, buffer_size=border_buffer_size)
+        label_img = clear_xy_borders(label_img, buffer_size=border_buffer_size)
 
     # returns boolean array
     if max_hole_size is not None:
-        for label_id in np.unique(label_image)[1:]:
-            mask = label_image == label_id
+        for label_id in np.unique(label_img)[1:]:
+            mask = label_img == label_id
             filled_mask = morphology.remove_small_holes(
                 mask, area_threshold=max_hole_size
             )
-            label_image[filled_mask] = label_id
+            label_img[filled_mask] = label_id
 
-    return label(label_image).astype(np.uint8)
+    return label(label_img).astype(np.uint8)
 
 
 def find_objects(label_image, max_label=None):
