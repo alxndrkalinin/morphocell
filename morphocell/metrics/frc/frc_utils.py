@@ -57,7 +57,6 @@
 from math import floor
 
 import numpy as np
-import pandas as pd
 import scipy.optimize as optimize
 from scipy.interpolate import interp1d, UnivariateSpline
 
@@ -773,28 +772,6 @@ class FourierCorrelationDataCollection(object):
     def nitems(self):
         return len(self._data)
 
-    def as_dataframe(self, include_results=False):
-        """
-        Convert a FourierCorrelationDataCollection object into a Pandas
-        dataframe. Only returns the raw Fourier correlation data,
-        not the processed results.
-
-        :return: A dataframe with columns: Angle (categorical), Correlation (Y),
-                 Frequency (X) and nPoints (number of points in each bin)
-        """
-        df = pd.DataFrame(columns=["Correlation", "Frequency", "nPoints", "Angle"])
-
-        for key, dataset in self._data.items():
-            df_temp = dataset.as_dataframe(include_results=include_results)
-
-            angle = np.full(len(df_temp), int(key), dtype=np.int64)
-            df_temp["Angle"] = angle
-
-            df = pd.concat([df, df_temp], ignore_index=True)
-
-        df["Angle"] = df["Angle"].astype("category")
-        return df
-
 
 class FourierCorrelationData(object):
     """
@@ -826,51 +803,6 @@ class FourierCorrelationData(object):
                     self.correlation[key] = value
                 else:
                     raise ValueError("Unknown key found in the initialization data")
-
-    def as_dataframe(self, include_results=False):
-        """
-        Convert a FourierCorrelationData object into a Pandas
-        dataframe. Only returns the raw Fourier correlation data,
-        not the processed results.
-
-        :return: A dataframe with columns: Correlation (Y), Frequency (X) and
-                 nPoints (number of points in each bin)
-        """
-        if include_results is False:
-            to_df = {
-                "Correlation": self.correlation["correlation"],
-                "Frequency": self.correlation["frequency"],
-                "nPoints": self.correlation["points-x-bin"],
-            }
-        else:
-            resolution = np.full(
-                self.correlation["correlation"].shape,
-                self.resolution["resolution"],
-                dtype=np.float32,
-            )
-            resolution_point_x = np.full(
-                self.correlation["correlation"].shape,
-                self.resolution["resolution-point"][0],
-                dtype=np.float32,
-            )
-            resolution_point_y = np.full(
-                self.correlation["correlation"].shape,
-                self.resolution["resolution-point"][1],
-                dtype=np.float32,
-            )
-            threshold = (self.resolution["threshold"],)
-
-            to_df = {
-                "Correlation": self.correlation["correlation"],
-                "Frequency": self.correlation["frequency"],
-                "nPoints": self.correlation["points-x-bin"],
-                "Resolution": resolution,
-                "Resolution_X": resolution_point_x,
-                "Resolution_Y": resolution_point_y,
-                "Threshold": threshold,
-            }
-
-        return pd.DataFrame(to_df)
 
 
 def fit_frc_curve(data_set, degree, fit_type="spline"):
