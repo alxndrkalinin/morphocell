@@ -56,9 +56,15 @@ all = [
     "morphocell[frc]",
     "morphocell[cellpose]",
 ]
+dev = [
+    "pooch",
+]
 
 [tool.setuptools.dynamic]
 version = { attr = "morphocell.__version__" }
 
 [tool.setuptools.packages.find]
 exclude = ["examples*"]
+
+[tool.mypy]
+ignore_errors = true

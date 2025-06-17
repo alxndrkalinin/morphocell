@@ -351,8 +351,10 @@ def get_xy_block_coords(
     block_coords = []  # type: list[tuple[int, ...]]
     for y in np.arange(0, height // crop_h) * crop_h:
         block_coords.extend(
-            (y, y + crop_h, x, x + crop_w)
-            for x in np.arange(0, width // crop_w) * crop_w
+            [
+                (int(y), int(y + crop_h), int(x), int(x + crop_w))
+                for x in np.arange(0, width // crop_w) * crop_w
+            ]
         )
 
     return np.asarray(block_coords).astype(int)
