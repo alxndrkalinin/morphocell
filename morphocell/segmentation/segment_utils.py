@@ -322,14 +322,15 @@ def fill_holes_slicer(
 
     Inspired by: https://github.com/True-North-Intelligent-Algorithms/tnia-python/blob/main/tnia/morphology/fill_holes.py
     """
-    axes = range(image.ndim) if axes is None else axes
+    img = np.asarray(image)
+    axes = range(img.ndim) if axes is None else axes
 
-    for label_id in np.unique(image)[1:]:
-        binary = image == label_id
+    for label_id in np.unique(img)[1:]:
+        binary = img == label_id
 
         for _ in range(num_iterations):
             for axis in axes:
-                slicers = [slice(None)] * image.ndim
+                slicers = [slice(None)] * img.ndim
                 for i in range(binary.shape[axis]):
                     slicers[axis] = slice(i, i + 1)
                     binary_slice = binary[tuple(slicers)]
@@ -342,6 +343,6 @@ def fill_holes_slicer(
                         )
                     binary[tuple(slicers)] = filled_slice
 
-        image[binary] = label_id
+        img[binary] = label_id
 
-    return image
+    return img
