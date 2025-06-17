@@ -11,8 +11,11 @@ from ..skimage import filters, util
 
 
 def get_threshold_otsu(
-    image: npt.ArrayLike, blur_sigma=5, preserve_range=False, nbins=256
-) -> npt.ArrayLike:
+    image: npt.ArrayLike,
+    blur_sigma: int = 5,
+    preserve_range: bool = False,
+    nbins: int = 256,
+) -> float:
     """Perform Otsu's thresholding with Gaussian blur."""
     image = filters.gaussian(image, sigma=blur_sigma, preserve_range=preserve_range)
     return filters.threshold_otsu(image, nbins=nbins)
@@ -28,15 +31,17 @@ def select_nonempty_patches(
     """Select XY patches from 3D image by percent of nonzero voxels."""
     verboseprint = print if verbose else lambda *a, **k: None
 
-    selected_patches = []
+    selected_patches: list[list[int]] = []
+
+    image_np = np.asarray(image)
 
     if threshold is None:
-        threshold = get_threshold_otsu(image)
+        threshold = float(get_threshold_otsu(image_np))
 
-    binary_image = (util.img_as_float32(image) > threshold).astype(np.uint8)
+    binary_image = (util.img_as_float32(image_np) > threshold).astype(np.uint8)
 
-    patch_coordinates = get_xy_block_coords(image.shape, patch_size)
-    verboseprint(f"Nonzero pixels in the image: {binary_image.mean()}")  # type: ignore[operator]
+    patch_coordinates = get_xy_block_coords(image_np.shape, patch_size)
+    verboseprint(f"Nonzero pixels in the image: {binary_image.mean()}")
 
     for single_patch_coords in patch_coordinates:
         binary_tile = get_xy_block(binary_image, single_patch_coords)

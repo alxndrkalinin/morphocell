@@ -326,9 +326,24 @@ def crop_to_divisor(
         )
 
 
+def rotate_image(
+    image: np.ndarray, angle: float, interpolation: str = "nearest"
+) -> np.ndarray:
+    """Rotate 3D image around the Z axis by ``angle`` degrees."""
+    xp = get_array_module(image)
+    order = 1 if interpolation == "linear" else 0
+    if xp.__name__ == np.__name__:
+        from scipy.ndimage import rotate
+    else:
+        from cupyx.scipy.ndimage import rotate  # type: ignore
+    return rotate(
+        image, angle, axes=(1, 2), reshape=False, order=order, mode="constant"
+    )
+
+
 def get_xy_block_coords(
     image_shape: Sequence[int], crop_hw: int | tuple[int, int]
-) -> npt.ArrayLike:
+) -> np.ndarray:
     """Compute coordinates of non-overlapping image blocks of specified shape."""
     crop_h, crop_w = (crop_hw, crop_hw) if isinstance(crop_hw, int) else crop_hw
     height, width = image_shape[1:]
@@ -336,8 +351,10 @@ def get_xy_block_coords(
     block_coords = []  # type: list[tuple[int, ...]]
     for y in np.arange(0, height // crop_h) * crop_h:
         block_coords.extend(
-            (y, y + crop_h, x, x + crop_w)
-            for x in np.arange(0, width // crop_w) * crop_w
+            [
+                (int(y), int(y + crop_h), int(x), int(x + crop_w))
+                for x in np.arange(0, width // crop_w) * crop_w
+            ]
         )
 
     return np.asarray(block_coords).astype(int)

@@ -30,7 +30,7 @@ try:
 except Exception:
     _IS_XVBF_AVAILABLE = False
     warnings.warn(
-        "pyvirtualdisplay is not available. DeconcolutionLab2 deconvolution will not work."
+        "pyvirtualdisplay is not available. DeconvolutionLab2 deconvolution will not work."
     )
 
 
@@ -44,14 +44,14 @@ def check_tf_available():
 
 
 def richardson_lucy_dl2(
-    image: Union[str, npt.ArrayLike],
-    psf: Union[str, npt.ArrayLike],
+    image: Union[str, Path, npt.ArrayLike],
+    psf: Union[str, Path, npt.ArrayLike],
     n_iter: int = 10,
-    dl2_path: str = "DeconcolutionLab2_-0.1.0-SNAPSHOT-jar-with-dependencies.jar",
+    dl2_path: str = "DeconvolutionLab2-0.1.0-SNAPSHOT-jar-with-dependencies.jar",
     tmp_dir: Union[Path, Optional[str]] = None,
     verbose: bool = False,
 ) -> Union[int, np.ndarray]:
-    """Perform GPU-accelerated (optional) Lucy-Richardson deconvolution using DeconvoltuionLab2."""
+    """Perform GPU-accelerated (optional) Lucy-Richardson deconvolution using DeconvolutionLab2."""
     verboseprint = print if verbose else lambda *a, **k: None
 
     if not _IS_XVBF_AVAILABLE:
@@ -143,8 +143,8 @@ def _run_rl_flowdec(image, psf, n_iter, start_mode, observer_fn, device):
 
 
 def richardson_lucy_flowdec(
-    image: Union[str, npt.ArrayLike],
-    psf: Union[str, npt.ArrayLike],
+    image: Union[str, Path, npt.ArrayLike],
+    psf: Union[str, Path, npt.ArrayLike],
     n_iter: int = 10,
     start_mode: str = "input",
     observer_fn: Optional[Callable] = None,
@@ -156,8 +156,14 @@ def richardson_lucy_flowdec(
     check_tf_available()
     verboseprint = print if verbose else lambda *a, **k: None
 
-    image = image if isinstance(image, np.ndarray) else io.imread(image)
-    psf = psf if isinstance(psf, np.ndarray) else io.imread(psf)
+    if isinstance(image, (str, Path)):
+        image = io.imread(str(image))
+    else:
+        image = np.asarray(image)
+    if isinstance(psf, (str, Path)):
+        psf = io.imread(str(psf))
+    else:
+        psf = np.asarray(psf)
 
     # assert image.shape == psf.shape
     verboseprint(
@@ -217,9 +223,9 @@ def decon_flowdec(
     return fl_decon_image.astype(np.uint16)
 
 
-def decon_iter_num_finder(
-    image: Union[str, npt.ArrayLike],
-    psf: Union[str, npt.ArrayLike],
+def deconv_iter_num_finder(
+    image: Union[str, Path, npt.ArrayLike],
+    psf: Union[str, Path, npt.ArrayLike],
     metric_fn: Callable,
     metric_threshold: Union[int, float],
     metric_kwargs: Optional[Dict[str, Any]] = None,
@@ -228,14 +234,18 @@ def decon_iter_num_finder(
     verbose: bool = False,
     subprocess_cuda: bool = False,
 ) -> Tuple[int, List[Dict[str, Union[int, float, np.ndarray]]]]:
-    """Find numer of LR decon iterations using image similarity metric."""
+    """Find number of LR deconvolution iterations using an image similarity metric."""
     check_tf_available()
     verboseprint = print if verbose else lambda *a, **k: None
 
-    if isinstance(image, str):
+    if isinstance(image, (str, Path)):
         image = io.imread(str(image))
-    if isinstance(psf, str):
+    else:
+        image = np.asarray(image)
+    if isinstance(psf, (str, Path)):
         psf = io.imread(str(psf))
+    else:
+        psf = np.asarray(psf)
     if metric_kwargs is None:
         metric_kwargs = {}
 
