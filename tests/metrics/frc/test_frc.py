@@ -6,7 +6,7 @@ from skimage import data
 
 from morphocell.skimage import filters
 from morphocell.cuda import ascupy, CUDAManager
-from morphocell.metrics.frc import calculate_frc, fsc_resolution
+from morphocell.metrics.frc import frc_resolution, fsc_resolution
 
 
 def _fractional_to_absolute(
@@ -96,11 +96,11 @@ def _assert_positive(result: Any) -> None:
 
 def test_calculate_frc_cpu_vs_gpu(cells_volume: np.ndarray) -> None:
     slice_image = _middle_slice(cells_volume)
-    cpu_res = calculate_frc(slice_image)
+    cpu_res = frc_resolution(slice_image)
     _assert_positive(cpu_res)
 
     if _gpu_available():
-        gpu_res = calculate_frc(ascupy(slice_image))
+        gpu_res = frc_resolution(ascupy(slice_image))
         assert np.isclose(cpu_res, gpu_res, atol=1e-5)
 
 
