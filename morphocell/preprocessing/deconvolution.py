@@ -8,9 +8,11 @@ from typing import Union, Tuple, Optional, Callable, List, Dict, Any
 from pathlib import Path
 
 from skimage import io
+from skimage._shared.utils import _supported_float_type
+from morphocell.skimage import restoration  # noqa: F401
 
 from ..image_utils import pad_image
-from ..cuda import RunAsCUDASubprocess
+from ..cuda import RunAsCUDASubprocess, get_array_module
 
 try:
     from flowdec import data as fd_data
@@ -223,6 +225,78 @@ def decon_flowdec(
     return fl_decon_image.astype(np.uint16)
 
 
+def richardson_lucy_skimage(
+    image: npt.ArrayLike,
+    psf: npt.ArrayLike,
+    n_iter: int = 10,
+    observer_fn: Optional[Callable] = None,
+    clip: bool = True,
+    filter_epsilon: Optional[float] = None,
+) -> np.ndarray:
+    """Iterative Lucy-Richardson deconvolution using scikit-image."""
+    xp = get_array_module(image)
+    if xp is not get_array_module(psf):
+        raise ValueError("image and psf must reside on the same device")
+
+    float_type = _supported_float_type(image.dtype)
+    image = xp.asarray(image, dtype=float_type)
+    psf = xp.asarray(psf, dtype=float_type)
+    estimate = xp.full(image.shape, 0.5, dtype=float_type)
+    psf_mirror = xp.flip(psf)
+    eps = 1e-12
+
+    if xp.__name__ == "cupy":
+        from cupyx.scipy.signal import convolve
+    else:
+        from scipy.signal import convolve
+
+    for i in range(1, n_iter + 1):
+        conv = convolve(estimate, psf, mode="same") + eps
+        if filter_epsilon:
+            relative_blur = xp.where(conv < filter_epsilon, 0, image / conv)
+        else:
+            relative_blur = image / conv
+        estimate *= convolve(relative_blur, psf_mirror, mode="same")
+        if observer_fn is not None:
+            observer_fn(estimate, i)
+
+    if clip:
+        estimate = xp.clip(estimate, -1, 1)
+    return estimate
+
+
+def decon_skimage(
+    image: Union[str, npt.ArrayLike],
+    psf: Union[str, npt.ArrayLike],
+    n_iter: int = 1,
+    pad_psf: bool = False,
+    pad_size_z: int = 1,
+    observer_fn: Optional[Callable] = None,
+    clip: bool = True,
+    filter_epsilon: Optional[float] = None,
+) -> np.ndarray:
+    """Perform scikit-image deconvolution with image padding."""
+    if isinstance(image, str):
+        image = io.imread(str(image))
+    if isinstance(psf, str):
+        psf = io.imread(str(psf))
+
+    padded_img = pad_image(image, pad_size_z, mode="reflect")
+    padded_psf = pad_image(psf, pad_size_z, mode="reflect") if pad_psf else psf
+
+    decon_image = richardson_lucy_skimage(
+        padded_img,
+        padded_psf,
+        n_iter=n_iter,
+        observer_fn=observer_fn,
+        clip=clip,
+        filter_epsilon=filter_epsilon,
+    )
+
+    decon_image = decon_image[pad_size_z : image.shape[0] + pad_size_z, :, :]
+    return decon_image.astype(np.uint16)
+
+
 def deconv_iter_num_finder(
     image: Union[str, Path, npt.ArrayLike],
     psf: Union[str, Path, npt.ArrayLike],
@@ -233,9 +307,17 @@ def deconv_iter_num_finder(
     pad_size_z: int = 1,
     verbose: bool = False,
     subprocess_cuda: bool = False,
+    implementation: str = "flowdec",
 ) -> Tuple[int, List[Dict[str, Union[int, float, np.ndarray]]]]:
-    """Find number of LR deconvolution iterations using an image similarity metric."""
-    check_tf_available()
+    """Find number of LR deconvolution iterations using an image similarity metric.
+
+    Parameters
+    ----------
+    implementation : str, optional
+        Which LR implementation to use, ``"flowdec"`` (default) or ``"skimage"``.
+    """
+    if implementation == "flowdec":
+        check_tf_available()
     verboseprint = print if verbose else lambda *a, **k: None
 
     if isinstance(image, (str, Path)):
@@ -302,13 +384,21 @@ def deconv_iter_num_finder(
         return decon_observer
 
     observer = get_decon_observer(metric_fn=metric_fn, metric_kwargs=metric_kwargs)
-    _ = decon_flowdec(
-        image,
-        psf,
-        n_iter=max_iter,
-        observer_fn=observer,
-        verbose=verbose,
-        subprocess_cuda=subprocess_cuda,
-    )
+    if implementation == "flowdec":
+        _ = decon_flowdec(
+            image,
+            psf,
+            n_iter=max_iter,
+            observer_fn=observer,
+            verbose=verbose,
+            subprocess_cuda=subprocess_cuda,
+        )
+    else:
+        _ = decon_skimage(
+            image,
+            psf,
+            n_iter=max_iter,
+            observer_fn=observer,
+        )
 
     return (thresh_iter, results)
