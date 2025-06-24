@@ -4,7 +4,7 @@ from .average_precision import average_precision
 from .skimage_metrics import psnr, ssim
 from .feature import cosine_median, morphology_correlations
 from .frc import (
-    calculate_frc,
+    frc_resolution,
     fsc_resolution,
     five_crop_resolution,
     grid_crop_resolution,
@@ -15,7 +15,7 @@ __all__ = [
     "psnr",
     "ssim",
     "cosine_median",
-    "calculate_frc",
+    "frc_resolution",
     "fsc_resolution",
     "average_precision",
     "five_crop_resolution",

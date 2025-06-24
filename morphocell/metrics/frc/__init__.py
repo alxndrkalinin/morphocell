@@ -1,7 +1,7 @@
 """Expose FRC functions."""
 
 from .frc import (
-    calculate_frc,
+    frc_resolution,
     fsc_resolution,
     five_crop_resolution,
     grid_crop_resolution,
@@ -9,7 +9,7 @@ from .frc import (
 )
 
 __all__ = [
-    "calculate_frc",
+    "frc_resolution",
     "fsc_resolution",
     "five_crop_resolution",
     "grid_crop_resolution",
