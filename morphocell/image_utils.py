@@ -138,7 +138,7 @@ def pad_image_to_shape(
     return img
 
 
-def pad_images_to_matching_shape(
+def pad_to_matching_shape(
     img1: np.ndarray, img2: np.ndarray, mode: str = "constant"
 ) -> tuple[np.ndarray, np.ndarray]:
     """Apply zero padding to make the size of two Images match."""
