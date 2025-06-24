@@ -29,8 +29,6 @@ from .frc_utils import (
     FourierCorrelationData,
     FourierCorrelationDataCollection,
     FourierCorrelationAnalysis,
-    FRCParams,
-    get_frc_params,
 )
 
 
@@ -115,7 +113,15 @@ class FRC(object):
 # https://github.com/sakoho81/miplib/blob/public/miplib/analysis/resolution/fourier_ring_correlation.py
 def calculate_single_image_frc(
     image: Image,
-    params: FRCParams,
+    *,
+    bin_delta: int = 1,
+    resolution_threshold: str = "fixed",
+    threshold_value: float = 0.143,
+    snr_value: float = 7.0,
+    curve_fit_type: str = "spline",
+    curve_fit_degree: int = 3,
+    disable_hamming: bool = False,
+    verbose: bool = False,
     average: bool = True,
     trim: bool = True,
     z_correction: float = 1.0,
@@ -123,15 +129,21 @@ def calculate_single_image_frc(
     """Calculate a regular FRC with a single image input.
 
     :param image: the image as an Image object
-    :param params: parameters for the FRC calculation
-    :return:      returns the FRC result as a FourierCorrelationData object
+    :param resolution_threshold: resolution threshold method
+    :param threshold_value: fixed or variable threshold value
+    :param snr_value: SNR value for SNR-based threshold
+    :param curve_fit_type: method used for curve fitting
+    :param curve_fit_degree: spline degree when using spline fit
+    :param disable_hamming: disable Hamming windowing if ``True``
+    :param verbose: print debug messages
+    :return: returns the FRC result as a FourierCorrelationData object
     """
     assert isinstance(image, Image)
 
     frc_data = FourierCorrelationDataCollection()
 
     # Hamming Windowing
-    if not params.disable_hamming:
+    if not disable_hamming:
         spacing = image.spacing
         device = image.device
         image = Image(hamming_window(image.data), spacing, device=device)
@@ -145,7 +157,7 @@ def calculate_single_image_frc(
     assert tuple(image1.spacing) == tuple(image2.spacing)
 
     # Run FRC
-    iterator = FourierRingIterator(image1.shape, params.bin_delta)
+    iterator = FourierRingIterator(image1.shape, bin_delta)
     frc_task = FRC(image1.data, image2.data, iterator)
     frc_data[0] = frc_task.execute()
 
@@ -153,7 +165,7 @@ def calculate_single_image_frc(
         # Split and make sure that the images are the same size
         image1, image2 = frc_checkerboard_split(image, reverse=True)
         image1, image2 = pad_images_to_matching_shape(image1, image2)
-        iterator = FourierRingIterator(image1.shape, params.bin_delta)
+        iterator = FourierRingIterator(image1.shape, bin_delta)
         frc_task = FRC(image1.data, image2.data, iterator)
 
         frc_data[0].correlation["correlation"] *= 0.5
@@ -164,15 +176,24 @@ def calculate_single_image_frc(
     def func(x, a, b, c, d):
         return a * np.exp(c * (x - b)) + d
 
-    fit_params = [0.95988146, 0.97979108, 13.90441896, 0.55146136]
+    params = [0.95988146, 0.97979108, 13.90441896, 0.55146136]
 
     # Analyze results
-    analyzer = FourierCorrelationAnalysis(frc_data, image1.spacing[0], params)
+    analyzer = FourierCorrelationAnalysis(
+        frc_data,
+        image1.spacing[0],
+        resolution_threshold=resolution_threshold,
+        threshold_value=threshold_value,
+        snr_value=snr_value,
+        curve_fit_type=curve_fit_type,
+        curve_fit_degree=curve_fit_degree,
+        verbose=verbose,
+    )
 
     result = analyzer.execute(z_correction=z_correction)[0]
     point = result.resolution["resolution-point"][1]
 
-    cut_off_correction = func(point, *fit_params)
+    cut_off_correction = func(point, *params)
     result.resolution["spacing"] /= cut_off_correction
     result.resolution["resolution"] /= cut_off_correction
 
@@ -207,12 +228,13 @@ def calculate_frc(
         f"The image dimensions are {image.shape} and spacing {image.spacing} um."
     )  # type: ignore[operator]
 
-    params = get_frc_params(
+    frc_result = calculate_single_image_frc(
+        image,
         bin_delta=bin_delta,
-        curve_fit_type="smooth-spline",
         resolution_threshold=resolution_threshold,
+        curve_fit_type="smooth-spline",
+        verbose=verbose,
     )
-    frc_result = calculate_single_image_frc(image, params)
 
     frc_result = (
         frc_result.resolution["resolution"] if return_resolution else frc_result
@@ -276,27 +298,29 @@ def calculate_fsc_result(
     disable_3d_sum: bool,
 ) -> Any:
     """Calculate FSC result based on preprocessed image cubes."""
-    params = get_frc_params(
-        bin_delta=bin_delta,
-        angle_delta=15,
-        extract_angle_delta=0.1,
-        resolution_threshold=resolution_threshold,
-        curve_fit_type="spline",
-    )
-
     if len(img_cubes_processed) == 1:
         return calculate_one_image_sectioned_fsc(
             img_cubes_processed[0],
-            params,
+            bin_delta=bin_delta,
+            angle_delta=15,
+            extract_angle_delta=0.1,
+            resolution_threshold=resolution_threshold,
+            curve_fit_type="spline",
             z_correction=z_correction,
             disable_3d_sum=disable_3d_sum,
+            verbose=False,
         )
     elif len(img_cubes_processed) == 2:
         return calculate_two_image_sectioned_fsc(
             img_cubes_processed[0],
             img_cubes_processed[1],
-            params,
+            bin_delta=bin_delta,
+            angle_delta=15,
+            extract_angle_delta=0.1,
+            resolution_threshold=resolution_threshold,
+            curve_fit_type="spline",
             z_correction=z_correction,
+            verbose=False,
         )
     else:
         raise ValueError("FSC: incorrect number of input images. Should be 1 or 2.")
@@ -343,7 +367,17 @@ def calculate_fsc(
 # https://github.com/sakoho81/miplib/blob/public/miplib/analysis/resolution/fourier_shell_correlation.py
 def calculate_one_image_sectioned_fsc(
     image: Image,
-    params: FRCParams,
+    *,
+    bin_delta: int = 10,
+    angle_delta: int = 15,
+    extract_angle_delta: float = 0.1,
+    resolution_threshold: str = "fixed",
+    threshold_value: float = 0.143,
+    snr_value: float = 7.0,
+    curve_fit_type: str = "spline",
+    curve_fit_degree: int = 3,
+    disable_hamming: bool = False,
+    verbose: bool = False,
     z_correction: float = 1.0,
     disable_3d_sum: bool = False,
 ) -> FourierCorrelationDataCollection:
@@ -366,31 +400,41 @@ def calculate_one_image_sectioned_fsc(
 
     image1, image2 = frc_checkerboard_split(image, disable_3d_sum=disable_3d_sum)
 
-    image1 = Image(hamming_window(image1.data), image1.spacing)
-    image2 = Image(hamming_window(image2.data), image2.spacing)
+    if not disable_hamming:
+        image1 = Image(hamming_window(image1.data), image1.spacing)
+        image2 = Image(hamming_window(image2.data), image2.spacing)
 
     iterator = AxialExcludeSectionedFourierShellIterator(
         image1.shape,
-        params.bin_delta,
-        params.angle_delta,
-        params.extract_angle_delta,
+        bin_delta,
+        angle_delta,
+        extract_angle_delta,
     )
     fsc_task = DirectionalFSC(image1.data, image2.data, iterator)
 
     data = fsc_task.execute()
 
-    analyzer = FourierCorrelationAnalysis(data, image1.spacing[0], params)
+    analyzer = FourierCorrelationAnalysis(
+        data,
+        image1.spacing[0],
+        resolution_threshold=resolution_threshold,
+        threshold_value=threshold_value,
+        snr_value=snr_value,
+        curve_fit_type=curve_fit_type,
+        curve_fit_degree=curve_fit_degree,
+        verbose=verbose,
+    )
     result = analyzer.execute(z_correction=z_correction)
 
     def func(x, a, b, c, d):
         return a * np.exp(c * (x - b)) + d
 
-    fit_params = [0.95988146, 0.97979108, 13.90441896, 0.55146136]
+    params = [0.95988146, 0.97979108, 13.90441896, 0.55146136]
 
     for angle, dataset in result:
         point = dataset.resolution["resolution-point"][1]
 
-        cut_off_correction = func(point, *fit_params)
+        cut_off_correction = func(point, *params)
         dataset.resolution["spacing"] /= cut_off_correction
         dataset.resolution["resolution"] /= cut_off_correction
 
@@ -398,25 +442,48 @@ def calculate_one_image_sectioned_fsc(
 
 
 def calculate_two_image_sectioned_fsc(
-    image1: Image, image2: Image, params: FRCParams, z_correction: float = 1.0
+    image1: Image,
+    image2: Image,
+    *,
+    bin_delta: int = 10,
+    angle_delta: int = 15,
+    extract_angle_delta: float = 0.1,
+    resolution_threshold: str = "fixed",
+    threshold_value: float = 0.143,
+    snr_value: float = 7.0,
+    curve_fit_type: str = "spline",
+    curve_fit_degree: int = 3,
+    disable_hamming: bool = False,
+    verbose: bool = False,
+    z_correction: float = 1.0,
 ) -> FourierCorrelationDataCollection:
     """Calculate two-image sectioned FSC."""
     assert isinstance(image1, Image)
     assert isinstance(image2, Image)
 
-    image1 = Image(hamming_window(image1.data), image1.spacing)
-    image2 = Image(hamming_window(image2.data), image2.spacing)
+    if not disable_hamming:
+        image1 = Image(hamming_window(image1.data), image1.spacing)
+        image2 = Image(hamming_window(image2.data), image2.spacing)
 
     iterator = AxialExcludeSectionedFourierShellIterator(
         image1.shape,
-        params.bin_delta,
-        params.angle_delta,
-        params.extract_angle_delta,
+        bin_delta,
+        angle_delta,
+        extract_angle_delta,
     )
     fsc_task = DirectionalFSC(image1.data, image2.data, iterator)
     data = fsc_task.execute()
 
-    analyzer = FourierCorrelationAnalysis(data, image1.spacing[0], params)
+    analyzer = FourierCorrelationAnalysis(
+        data,
+        image1.spacing[0],
+        resolution_threshold=resolution_threshold,
+        threshold_value=threshold_value,
+        snr_value=snr_value,
+        curve_fit_type=curve_fit_type,
+        curve_fit_degree=curve_fit_degree,
+        verbose=verbose,
+    )
     return analyzer.execute(z_correction=z_correction)
 
 
