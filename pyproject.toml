@@ -38,26 +38,27 @@ Homepage = "https://github.com/alxndrkalinin/morphocell"
 Repository = "https://github.com/alxndrkalinin/morphocell"
 
 [project.optional-dependencies]
-decon = [
+deconv = [
     "tensorflow-gpu>=1.14.0,<2.2.1",
     "flowdec[tf_gpu]>=1.1.0",
     "pyvirtualdisplay>=2.0",
     "cloudpickle>=2.0",
     "py3nvml>=0.2.6",
 ]
-frc = [
-    "miplib @ git+https://github.com/alxndrkalinin/miplib@public",
-]
 cellpose = [
     "cellpose>=0.6.0",
 ]
+dev = [
+    "ruff",
+    "mypy",
+    "pooch",
+    "pytest",
+]
 all = [
-    "morphocell[decon]",
+    "morphocell[deconv]",
     "morphocell[frc]",
     "morphocell[cellpose]",
-]
-dev = [
-    "pooch",
+    "morphocell[dev]",
 ]
 
 [tool.setuptools.dynamic]
@@ -67,17 +68,4 @@ version = { attr = "morphocell.__version__" }
 exclude = ["examples*"]
 
 [tool.mypy]
-# Allow the test suite to depend on optional runtime imports
 python_version = "3.10"
-
-[[tool.mypy.overrides]]
-module = "morphocell.metrics.frc.frc"
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "morphocell.preprocessing.deconvolution"
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "morphocell.segmentation.segment_utils"
-ignore_errors = true
