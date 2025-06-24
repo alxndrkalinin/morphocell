@@ -58,9 +58,9 @@ class FRC(object):
         if image1.ndim != 2:
             raise ValueError("Fourier ring correlation requires 2D images.")
 
-        # Expand to square
-        image1 = pad_image_to_cube(image1, np.max(image1.shape), mode="constant")
-        image2 = pad_image_to_cube(image2, np.max(image1.shape), mode="constant")
+        max_size = max(np.max(image1.shape), np.max(image2.shape))
+        image1 = pad_image_to_cube(image1, max_size, mode="constant")
+        image2 = pad_image_to_cube(image2, max_size, mode="constant")
 
         self.iterator = iterator
         # Calculate power spectra for the input images.
@@ -107,50 +107,34 @@ class FRC(object):
         return data_set
 
 
-def calculate_frc(
-    image: np.ndarray | Image,
+def frc_resolution(
+    image1: np.ndarray | Image,
+    image2: np.ndarray | Image | None = None,
+    *,
     bin_delta: int = 1,
     scales: float | Sequence[float] = 1.0,
-    resolution_threshold: str = "fixed",
-    return_resolution: bool = True,
+    zero_padding: bool = True,
+    curve_fit_type: str = "smooth-spline",
     verbose: bool = False,
-) -> Sequence | float:
-    """Calculate FRC-based 2D image resolution."""
-    verboseprint = print if verbose else lambda *a, **k: None
+) -> float:
+    """Calculate either single- or two-image FRC-based 2D image resolution."""
 
-    if not isinstance(image, Image):
-        xp = get_array_module(image)
-        ndarray = getattr(xp, "ndarray")  # avoid mypy complains
-        if not isinstance(image, ndarray):
-            raise ValueError(
-                "FRC: incorrect input, should be 2D Image, Numpy or CuPy array."
-            )
-        if isinstance(scales, (int, float)):
-            scales = [scales, scales]
-        image = Image(image, scales)
-
-    # assert image.shape[0] == image.shape[1], "FRC: input image should be square."
-    assert len(image.spacing) == 2
-    verboseprint(
-        f"The image dimensions are {image.shape} and spacing {image.spacing} um."
-    )  # type: ignore[operator]
-
-    frc_result = calculate_single_image_frc(
-        image,
+    frc_result = calculate_frc(
+        image1,
+        image2,
         bin_delta=bin_delta,
-        resolution_threshold=resolution_threshold,
-        curve_fit_type="smooth-spline",
+        curve_fit_type=curve_fit_type,
+        scales=scales,
+        zero_padding=zero_padding,
         verbose=verbose,
     )
 
-    frc_result = (
-        frc_result.resolution["resolution"] if return_resolution else frc_result
-    )
-    return frc_result
+    return frc_result.resolution["resolution"]
 
 
-def calculate_single_image_frc(
-    image: np.ndarray | Image,
+def calculate_frc(
+    image1: np.ndarray | Image,
+    image2: np.ndarray | Image | None = None,
     *,
     bin_delta: int = 1,
     resolution_threshold: str = "fixed",
@@ -165,44 +149,66 @@ def calculate_single_image_frc(
     scales: float | Sequence[float] = 1.0,
     zero_padding: bool = True,
 ) -> FourierCorrelationData:
-    """Calculate a regular FRC with a single image input."""
+    """Calculate a regular FRC with single or two image inputs."""
 
-    image = preprocess_images((image,), scales, zero_padding, verbose)[0]
-    assert isinstance(image, Image)
-    assert len(image.spacing) == 2
+    # Track if we started with a single image (for averaging and cut-off correction)
+    single_image_mode = image2 is None
 
-    frc_data = FourierCorrelationDataCollection()
+    # Preprocess images
+    img_cubes = (image1,) if image2 is None else (image1, image2)
+    img_cubes_processed = preprocess_images(img_cubes, scales, zero_padding, verbose)
 
-    # Hamming Windowing
-    if not disable_hamming:
-        spacing = image.spacing
-        device = image.device
-        image = Image(hamming_window(image.data), spacing, device=device)
+    image1_processed = img_cubes_processed[0]
+    assert isinstance(image1_processed, Image)
+    assert len(image1_processed.spacing) == 2
 
-    image1, image2 = frc_checkerboard_split(image)
-    assert tuple(image1.shape) == tuple(image2.shape)
-    assert tuple(image1.spacing) == tuple(image2.spacing)
+    # Handle single vs two image cases
+    if single_image_mode:
+        # Apply Hamming window before splitting for single image
+        if not disable_hamming:
+            image1_processed = Image(
+                hamming_window(image1_processed.data),
+                image1_processed.spacing,
+                device=image1_processed.device,
+            )
 
-    # Run FRC
-    iterator = FourierRingIterator(image1.shape, bin_delta)
-    frc_task = FRC(image1.data, image2.data, iterator)
-    frc_data[0] = frc_task.execute()
+        # Split single image using checkerboard pattern
+        image1_final, image2_final = frc_checkerboard_split(image1_processed)
+    else:
+        # Use both preprocessed images
+        image2_processed = img_cubes_processed[1]
+        assert isinstance(image2_processed, Image)
+        assert len(image2_processed.spacing) == 2
 
-    if average:
-        # Split again with reverse pattern
-        image1, image2 = frc_checkerboard_split(image, reverse=True)
-        iterator = FourierRingIterator(image1.shape, bin_delta)
-        frc_task = FRC(image1.data, image2.data, iterator)
+        # Apply Hamming window to both images
+        if not disable_hamming:
+            image1_processed = Image(
+                hamming_window(image1_processed.data), image1_processed.spacing
+            )
+            image2_processed = Image(
+                hamming_window(image2_processed.data), image2_processed.spacing
+            )
 
-        frc_data[0].correlation["correlation"] *= 0.5
-        frc_data[0].correlation["correlation"] += (
-            0.5 * frc_task.execute().correlation["correlation"]
+        image1_final, image2_final = image1_processed, image2_processed
+
+    # Calculate FRC
+    frc_data = _calculate_frc_core(image1_final, image2_final, bin_delta)
+
+    # Average with reverse pattern (only for single image mode)
+    if average and single_image_mode:
+        image1_rev, image2_rev = frc_checkerboard_split(image1_processed, reverse=True)
+        frc_data_rev = _calculate_frc_core(image1_rev, image2_rev, bin_delta)
+
+        # Average the two results
+        frc_data[0].correlation["correlation"] = (
+            0.5 * frc_data[0].correlation["correlation"]
+            + 0.5 * frc_data_rev[0].correlation["correlation"]
         )
 
     # Analyze results
     analyzer = FourierCorrelationAnalysis(
         frc_data,
-        image1.spacing[0],
+        image1_final.spacing[0],
         resolution_threshold=resolution_threshold,
         threshold_value=threshold_value,
         snr_value=snr_value,
@@ -210,20 +216,40 @@ def calculate_single_image_frc(
         curve_fit_degree=curve_fit_degree,
         verbose=verbose,
     )
-
     result = analyzer.execute(z_correction=z_correction)[0]
-    point = result.resolution["resolution-point"][1]
 
-    # Apply cut-off correction for single image FRC
+    # Apply cut-off correction (only for single image case)
+    if single_image_mode:
+        _apply_cutoff_correction(result)
+
+    return result
+
+
+def _calculate_frc_core(
+    image1: Image, image2: Image, bin_delta: int
+) -> FourierCorrelationDataCollection:
+    """Core FRC calculation logic."""
+    assert tuple(image1.shape) == tuple(image2.shape)
+    assert tuple(image1.spacing) == tuple(image2.spacing)
+
+    frc_data = FourierCorrelationDataCollection()
+    iterator = FourierRingIterator(image1.shape, bin_delta)
+    frc_task = FRC(image1.data, image2.data, iterator)
+    frc_data[0] = frc_task.execute()
+    return frc_data
+
+
+def _apply_cutoff_correction(result: FourierCorrelationData) -> None:
+    """Apply cut-off correction for single image FRC."""
+
     def func(x, a, b, c, d):
         return a * np.exp(c * (x - b)) + d
 
     params = [0.95988146, 0.97979108, 13.90441896, 0.55146136]
+    point = result.resolution["resolution-point"][1]
     cut_off_correction = func(point, *params)
     result.resolution["spacing"] /= cut_off_correction
     result.resolution["resolution"] /= cut_off_correction
-
-    return result
 
 
 def preprocess_images(
@@ -685,16 +711,7 @@ def calculate_sectioned_fsc(
 
     # Apply cut-off correction (only for single image case)
     if single_image:
-
-        def func(x, a, b, c, d):
-            return a * np.exp(c * (x - b)) + d
-
-        params = [0.95988146, 0.97979108, 13.90441896, 0.55146136]
-
         for angle, dataset in result:
-            point = dataset.resolution["resolution-point"][1]
-            cut_off_correction = func(point, *params)
-            dataset.resolution["spacing"] /= cut_off_correction
-            dataset.resolution["resolution"] /= cut_off_correction
+            _apply_cutoff_correction(dataset)
 
     return result
