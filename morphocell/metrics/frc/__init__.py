@@ -3,7 +3,6 @@
 from .frc import (
     calculate_frc,
     calculate_fsc,
-    FRCParams,
     five_crop_resolution,
     grid_crop_resolution,
     frc_resolution_difference,
@@ -12,7 +11,6 @@ from .frc import (
 __all__ = [
     "calculate_frc",
     "calculate_fsc",
-    "FRCParams",
     "five_crop_resolution",
     "grid_crop_resolution",
     "frc_resolution_difference",

@@ -69,4 +69,15 @@ exclude = ["examples*"]
 
 [tool.mypy]
 python_version = "3.10"
+
+[[tool.mypy.overrides]]
+module = "morphocell.metrics.frc.frc"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "morphocell.preprocessing.deconvolution"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "morphocell.segmentation.segment_utils"
 ignore_errors = true
