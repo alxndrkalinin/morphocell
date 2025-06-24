@@ -62,10 +62,26 @@ from scipy.interpolate import interp1d, UnivariateSpline
 
 from morphocell.skimage import exposure
 from morphocell.image_utils import rotate_image
-from argparse import Namespace
+from dataclasses import dataclass
 
 
-def get_frc_options(
+@dataclass
+class FRCParams:
+    """Parameters controlling FRC/FSC calculations."""
+
+    bin_delta: int = 1
+    angle_delta: int = 15
+    extract_angle_delta: float = 0.1
+    resolution_threshold: str = "fixed"
+    curve_fit_type: str = "spline"
+    curve_fit_degree: int = 3
+    threshold_value: float = 0.143
+    snr_value: float = 7.0
+    disable_hamming: bool = False
+    verbose: bool = False
+
+
+def get_frc_params(
     bin_delta: int = 1,
     angle_delta: int = 15,
     extract_angle_delta: float = 0.1,
@@ -73,19 +89,16 @@ def get_frc_options(
     curve_fit_type: str = "spline",
     disable_hamming: bool = False,
     verbose: bool = False,
-) -> Namespace:
-    """Return a :class:`argparse.Namespace` with common FRC/FSC parameters."""
+) -> FRCParams:
+    """Return an :class:`FRCParams` with common FRC/FSC settings."""
 
-    return Namespace(
-        d_bin=bin_delta,
-        d_angle=angle_delta,
-        d_extract_angle=extract_angle_delta,
+    return FRCParams(
+        bin_delta=bin_delta,
+        angle_delta=angle_delta,
+        extract_angle_delta=extract_angle_delta,
+        resolution_threshold=resolution_threshold,
+        curve_fit_type=curve_fit_type,
         disable_hamming=disable_hamming,
-        resolution_threshold_criterion=resolution_threshold,
-        resolution_threshold_value=0.143,
-        resolution_snr_value=7.0,
-        frc_curve_fit_degree=3,
-        frc_curve_fit_type=curve_fit_type,
         verbose=verbose,
     )
 
@@ -917,11 +930,13 @@ def calculate_resolution_threshold_curve(data_set, criterion, threshold, snr):
 
 
 class FourierCorrelationAnalysis(object):
-    def __init__(self, data, spacing, args):
+    def __init__(
+        self, data: FourierCorrelationDataCollection, spacing: float, params: FRCParams
+    ) -> None:
         assert isinstance(data, FourierCorrelationDataCollection)
 
         self.data_collection = data
-        self.args = args
+        self.params = params
         self.spacing = spacing
 
     def execute(self, z_correction=1):
@@ -932,13 +947,13 @@ class FourierCorrelationAnalysis(object):
                  The return value is just for convenience.
         """
 
-        criterion = self.args.resolution_threshold_criterion
-        threshold = self.args.resolution_threshold_value
-        snr = self.args.resolution_snr_value
-        # tolerance = self.args.resolution_point_sigma
-        degree = self.args.frc_curve_fit_degree
-        fit_type = self.args.frc_curve_fit_type
-        verbose = self.args.verbose
+        criterion = self.params.resolution_threshold
+        threshold = self.params.threshold_value
+        snr = self.params.snr_value
+        # tolerance = self.params.resolution_point_sigma
+        degree = self.params.curve_fit_degree
+        fit_type = self.params.curve_fit_type
+        verbose = self.params.verbose
 
         for key, data_set in self.data_collection:
             self.data_collection[int(key)] = self._process_dataset(
