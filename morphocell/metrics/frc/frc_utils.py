@@ -821,7 +821,13 @@ def fit_frc_curve(data_set, degree, fit_type="spline"):
         #                     data, kind='slinear')
 
     elif fit_type == "spline":
-        equation = interp1d(data_set.correlation["frequency"], data, kind="slinear")
+        equation = interp1d(
+            data_set.correlation["frequency"],
+            data,
+            kind="slinear",
+            bounds_error=False,
+            fill_value="extrapolate",
+        )
 
     elif fit_type == "polynomial":
         coeff = np.polyfit(
@@ -894,7 +900,13 @@ def calculate_resolution_threshold_curve(data_set, criterion, threshold, snr):
     if criterion != "fixed":
         # coeff = np.polyfit(data_set.correlation["frequency"], points, 3)
         # equation = np.poly1d(coeff)
-        equation = interp1d(data_set.correlation["frequency"], points, kind="slinear")
+        equation = interp1d(
+            data_set.correlation["frequency"],
+            points,
+            kind="slinear",
+            bounds_error=False,
+            fill_value="extrapolate",
+        )
         curve = equation(data_set.correlation["frequency"])
     else:
         curve = points
