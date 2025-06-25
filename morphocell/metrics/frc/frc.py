@@ -4,8 +4,7 @@ from typing import Sequence, Callable
 
 import numpy as np
 
-from morphocell.image import Image
-from morphocell.cuda import asnumpy, get_array_module
+from morphocell.cuda import asnumpy
 from morphocell.image_utils import (
     crop_tl,
     crop_bl,
@@ -31,36 +30,64 @@ from .frc_utils import (
 
 
 def _empty_aggregate(*args: np.ndarray, **kwargs) -> np.ndarray:
-    """Return unchaged array."""
+    """Return unchanged array."""
     return args[0]
 
 
-def frc_checkerboard_split(image: Image, reverse=False, disable_3d_sum=False):
+def frc_checkerboard_split(
+    image: np.ndarray, reverse: bool = False, disable_3d_sum: bool = False
+) -> tuple[np.ndarray, np.ndarray]:
     """Split image into two by checkerboard pattern."""
     if reverse:
-        image1, image2 = reverse_checkerboard_split(
-            image.data, disable_3d_sum=disable_3d_sum
+        return reverse_checkerboard_split(image, disable_3d_sum=disable_3d_sum)
+    else:
+        return checkerboard_split(image, disable_3d_sum=disable_3d_sum)
+
+
+def preprocess_images(
+    image1: np.ndarray,
+    image2: np.ndarray | None = None,
+    *,
+    zero_padding: bool = True,
+    reverse_split: bool = False,
+    disable_hamming: bool = False,
+    disable_3d_sum: bool = False,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Preprocess input images with all modifications (padding, windowing, splitting)."""
+
+    single_image = image2 is None
+
+    # Apply padding to first image
+    if len(set(image1.shape)) > 1 and zero_padding:
+        image1 = pad_image_to_cube(image1)
+
+    if single_image:
+        # Split single image using checkerboard pattern
+        image1, image2 = frc_checkerboard_split(
+            image1, reverse=reverse_split, disable_3d_sum=disable_3d_sum
         )
     else:
-        image1, image2 = checkerboard_split(image.data, disable_3d_sum=disable_3d_sum)
-    image1 = Image(image1, spacing=image.spacing, device=image.device)
-    image2 = Image(image2, spacing=image.spacing, device=image.device)
+        # Apply padding to second image
+        if len(set(image2.shape)) > 1 and zero_padding:
+            image2 = pad_image_to_cube(image2)
+
+    # Apply Hamming windowing to both images independently
+    if not disable_hamming:
+        image1 = hamming_window(image1)
+        image2 = hamming_window(image2)
+
     return image1, image2
 
 
 class FRC(object):
-    """A class for calcuating 2D Fourier ring correlation."""
+    """A class for calculating 2D Fourier ring correlation."""
 
-    def __init__(self, image1, image2, iterator):
+    def __init__(self, image1: np.ndarray, image2: np.ndarray, iterator):
         """Create new FRC executable object and perform FFT on input images."""
         if image1.shape != image2.shape:
             raise ValueError("The image dimensions do not match")
         if image1.ndim != 2:
             raise ValueError("Fourier ring correlation requires 2D images.")
-
-        max_size = max(np.max(image1.shape), np.max(image2.shape))
-        image1 = pad_image_to_cube(image1, max_size, mode="constant")
-        image2 = pad_image_to_cube(image2, max_size, mode="constant")
 
         self.iterator = iterator
         # Calculate power spectra for the input images.
@@ -94,8 +121,13 @@ class FRC(object):
         c3 = asnumpy(c3)
         n_points = asnumpy(points)
 
-        with np.errstate(divide="ignore", invalid="ignore"):
-            frc = np.exp(np.log(np.abs(c1)) - 0.5 * (np.log(c2) + np.log(c3)))
+        with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+            eps = np.finfo(c1.dtype).tiny
+            c1_safe = np.clip(np.abs(c1), eps, None)
+            c2_safe = np.clip(c2, eps, None)
+            c3_safe = np.clip(c3, eps, None)
+
+            frc = np.exp(np.log(c1_safe) - 0.5 * (np.log(c2_safe) + np.log(c3_safe)))
             frc[frc == np.inf] = 0.0
             frc = np.nan_to_num(frc)
 
@@ -107,134 +139,14 @@ class FRC(object):
         return data_set
 
 
-def frc_resolution(
-    image1: np.ndarray | Image,
-    image2: np.ndarray | Image | None = None,
-    *,
-    bin_delta: int = 1,
-    scales: float | Sequence[float] = 1.0,
-    zero_padding: bool = True,
-    curve_fit_type: str = "smooth-spline",
-    verbose: bool = False,
-) -> float:
-    """Calculate either single- or two-image FRC-based 2D image resolution."""
-
-    frc_result = calculate_frc(
-        image1,
-        image2,
-        bin_delta=bin_delta,
-        curve_fit_type=curve_fit_type,
-        scales=scales,
-        zero_padding=zero_padding,
-        verbose=verbose,
-    )
-
-    return frc_result.resolution["resolution"]
-
-
-def calculate_frc(
-    image1: np.ndarray | Image,
-    image2: np.ndarray | Image | None = None,
-    *,
-    bin_delta: int = 1,
-    resolution_threshold: str = "fixed",
-    threshold_value: float = 0.143,
-    snr_value: float = 7.0,
-    curve_fit_type: str = "spline",
-    curve_fit_degree: int = 3,
-    disable_hamming: bool = False,
-    verbose: bool = False,
-    average: bool = True,
-    z_correction: float = 1.0,
-    scales: float | Sequence[float] = 1.0,
-    zero_padding: bool = True,
-) -> FourierCorrelationData:
-    """Calculate a regular FRC with single or two image inputs."""
-
-    # Track if we started with a single image (for averaging and cut-off correction)
-    single_image_mode = image2 is None
-
-    # Preprocess images
-    img_cubes = (image1,) if image2 is None else (image1, image2)
-    img_cubes_processed = preprocess_images(img_cubes, scales, zero_padding, verbose)
-
-    image1_processed = img_cubes_processed[0]
-    assert isinstance(image1_processed, Image)
-    assert len(image1_processed.spacing) == 2
-
-    # Handle single vs two image cases
-    if single_image_mode:
-        # Apply Hamming window before splitting for single image
-        if not disable_hamming:
-            image1_processed = Image(
-                hamming_window(image1_processed.data),
-                image1_processed.spacing,
-                device=image1_processed.device,
-            )
-
-        # Split single image using checkerboard pattern
-        image1_final, image2_final = frc_checkerboard_split(image1_processed)
-    else:
-        # Use both preprocessed images
-        image2_processed = img_cubes_processed[1]
-        assert isinstance(image2_processed, Image)
-        assert len(image2_processed.spacing) == 2
-
-        # Apply Hamming window to both images
-        if not disable_hamming:
-            image1_processed = Image(
-                hamming_window(image1_processed.data), image1_processed.spacing
-            )
-            image2_processed = Image(
-                hamming_window(image2_processed.data), image2_processed.spacing
-            )
-
-        image1_final, image2_final = image1_processed, image2_processed
-
-    # Calculate FRC
-    frc_data = _calculate_frc_core(image1_final, image2_final, bin_delta)
-
-    # Average with reverse pattern (only for single image mode)
-    if average and single_image_mode:
-        image1_rev, image2_rev = frc_checkerboard_split(image1_processed, reverse=True)
-        frc_data_rev = _calculate_frc_core(image1_rev, image2_rev, bin_delta)
-
-        # Average the two results
-        frc_data[0].correlation["correlation"] = (
-            0.5 * frc_data[0].correlation["correlation"]
-            + 0.5 * frc_data_rev[0].correlation["correlation"]
-        )
-
-    # Analyze results
-    analyzer = FourierCorrelationAnalysis(
-        frc_data,
-        image1_final.spacing[0],
-        resolution_threshold=resolution_threshold,
-        threshold_value=threshold_value,
-        snr_value=snr_value,
-        curve_fit_type=curve_fit_type,
-        curve_fit_degree=curve_fit_degree,
-        verbose=verbose,
-    )
-    result = analyzer.execute(z_correction=z_correction)[0]
-
-    # Apply cut-off correction (only for single image case)
-    if single_image_mode:
-        _apply_cutoff_correction(result)
-
-    return result
-
-
 def _calculate_frc_core(
-    image1: Image, image2: Image, bin_delta: int
+    image1: np.ndarray, image2: np.ndarray, bin_delta: int
 ) -> FourierCorrelationDataCollection:
     """Core FRC calculation logic."""
-    assert tuple(image1.shape) == tuple(image2.shape)
-    assert tuple(image1.spacing) == tuple(image2.spacing)
-
+    assert image1.shape == image2.shape
     frc_data = FourierCorrelationDataCollection()
     iterator = FourierRingIterator(image1.shape, bin_delta)
-    frc_task = FRC(image1.data, image2.data, iterator)
+    frc_task = FRC(image1, image2, iterator)
     frc_data[0] = frc_task.execute()
     return frc_data
 
@@ -252,82 +164,113 @@ def _apply_cutoff_correction(result: FourierCorrelationData) -> None:
     result.resolution["resolution"] /= cut_off_correction
 
 
-def preprocess_images(
-    images: np.ndarray | Image | Sequence[np.ndarray | Image],
-    scales: float | Sequence[float] = 1.0,
+def calculate_frc(
+    image1: np.ndarray,
+    image2: np.ndarray | None = None,
+    *,
+    bin_delta: int = 1,
+    resolution_threshold: str = "fixed",
+    threshold_value: float = 0.143,
+    snr_value: float = 7.0,
+    curve_fit_type: str = "spline",
+    curve_fit_degree: int = 3,
+    disable_hamming: bool = False,
+    average: bool = True,
+    z_correction: float = 1.0,
+    spacing: float | Sequence[float] = 1.0,
     zero_padding: bool = True,
-    verbose: bool = False,
-) -> Sequence[Image]:
-    """Preprocess input images (works for both 2D and 3D)."""
-    verboseprint = print if verbose else lambda *a, **k: None
+) -> FourierCorrelationData:
+    """Calculate a regular FRC with single or two image inputs."""
 
-    if not isinstance(images, tuple):
-        images = (images,)
+    single_image = image2 is None
+    reverse = average and single_image
+    original_image1 = image1.copy() if reverse else None
 
-    image_shape = None
-    images_processed = []
+    if isinstance(spacing, (int, float)):
+        spacing = [spacing] * image1.ndim
+    else:
+        spacing = list(spacing)
 
-    for img in images:
-        if not isinstance(img, Image):
-            xp = get_array_module(img)
-            ndarray = getattr(xp, "ndarray")  # avoid mypy complains
-            if not isinstance(img, ndarray):
-                raise ValueError(
-                    "Incorrect input, should be 2D/3D Image, Numpy or CuPy array."
-                )
+    image1, image2 = preprocess_images(
+        image1,
+        image2,
+        zero_padding=zero_padding,
+        disable_hamming=disable_hamming,
+    )
 
-        # Get the actual array data for dimension checking
-        img_data = img.data if isinstance(img, Image) else img
-        img_ndim = img_data.ndim
+    frc_data = _calculate_frc_core(image1, image2, bin_delta)
 
-        # Handle scaling based on image dimensions
-        if isinstance(scales, (int, float)):
-            scales = [scales] * img_ndim  # Scale to match image dimensions
-        elif len(scales) != img_ndim:
-            raise ValueError(
-                f"Scales length ({len(scales)}) must match image dimensions ({img_ndim})"
-            )
-
-        # Apply cubic/square padding if requested
-        if len(set(img_data.shape)) > 1 and zero_padding:
-            img_data = pad_image_to_cube(img_data)
-
-            # Verify shape after padding
-            expected_msg = "cube" if img_ndim == 3 else "square"
-            assert len(set(img_data.shape)) == 1, (
-                f"Image should be {expected_msg} after padding."
-            )
-
-            # Update img with padded data
-            if isinstance(img, Image):
-                img = Image(img_data, img.spacing, device=img.device)
-            else:
-                img = img_data
-
-        # Ensure all images have the same shape
-        current_shape = img.shape if isinstance(img, Image) else img.shape
-        if image_shape is None:
-            image_shape = current_shape
-        elif image_shape != current_shape:
-            raise ValueError("All input images should have the same shape.")
-
-        # Create Image object if needed
-        if not isinstance(img, Image):
-            img = Image(img, scales)
-
-        dimensionality = "3D" if img_ndim == 3 else "2D"
-        verboseprint(
-            f"{dimensionality} image dimensions are {img.shape} and spacing {img.spacing} um."
+    # Average with reverse pattern (only for single image mode)
+    if reverse:
+        # Use original unprocessed image for reverse split
+        image1, image2 = preprocess_images(
+            original_image1,
+            None,
+            reverse_split=reverse,
+            zero_padding=zero_padding,
+            disable_hamming=disable_hamming,
         )
-        images_processed.append(img)
 
-    return images_processed
+        frc_data_rev = _calculate_frc_core(image1, image2, bin_delta)
+
+        # Average the two results
+        frc_data[0].correlation["correlation"] = (
+            0.5 * frc_data[0].correlation["correlation"]
+            + 0.5 * frc_data_rev[0].correlation["correlation"]
+        )
+
+    # Analyze results
+    analyzer = FourierCorrelationAnalysis(
+        frc_data,
+        spacing[0],
+        resolution_threshold=resolution_threshold,
+        threshold_value=threshold_value,
+        snr_value=snr_value,
+        curve_fit_type=curve_fit_type,
+        curve_fit_degree=curve_fit_degree,
+    )
+    result = analyzer.execute(z_correction=z_correction)[0]
+
+    # Apply cut-off correction (only for single image case)
+    if single_image:
+        _apply_cutoff_correction(result)
+
+    return result
+
+
+def frc_resolution(
+    image1: np.ndarray,
+    image2: np.ndarray | None = None,
+    *,
+    bin_delta: int = 1,
+    spacing: float | Sequence[float] = 1.0,
+    zero_padding: bool = True,
+    curve_fit_type: str = "smooth-spline",
+) -> float:
+    """Calculate either single- or two-image FRC-based 2D image resolution."""
+
+    frc_result = calculate_frc(
+        image1,
+        image2,
+        bin_delta=bin_delta,
+        curve_fit_type=curve_fit_type,
+        spacing=spacing,
+        zero_padding=zero_padding,
+    )
+
+    return frc_result.resolution["resolution"]
 
 
 class DirectionalFSC(object):
     """Calculate the directional FSC between two images."""
 
-    def __init__(self, image1, image2, iterator, normalize_power=False):
+    def __init__(
+        self,
+        image1: np.ndarray,
+        image2: np.ndarray,
+        iterator,
+        normalize_power: bool = False,
+    ):
         """Initialize the directional FSC."""
 
         if image1.ndim != 3 or image1.shape[0] <= 1:
@@ -355,12 +298,7 @@ class DirectionalFSC(object):
             return self._result
 
     def execute(self):
-        """
-        Calculate the FRC.
-
-        :return: Returns the FRC results. They are also saved inside the class.
-                 The return value is just for convenience.
-        """
+        """Calculate the FSC."""
         data_structure = FourierCorrelationDataCollection()
         radii, angles = self.iterator.steps
         freq_nyq = self.iterator.nyquist
@@ -389,8 +327,15 @@ class DirectionalFSC(object):
             c3_i = asnumpy(c3[i])
             n_points = asnumpy(points[i])
 
-            with np.errstate(divide="ignore", invalid="ignore"):
-                frc = np.abs(c1_i) / np.sqrt(c2_i * c3_i)
+            with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+                eps = np.finfo(c2_i.dtype).tiny
+                c1_safe = np.clip(np.abs(c1_i), eps, None)
+                c2_safe = np.clip(c2_i, eps, None)
+                c3_safe = np.clip(c3_i, eps, None)
+
+                frc = np.exp(
+                    np.log(c1_safe) - 0.5 * (np.log(c2_safe) + np.log(c3_safe))
+                )
                 frc[frc == np.inf] = 0.0
                 frc = np.nan_to_num(frc)
 
@@ -404,16 +349,103 @@ class DirectionalFSC(object):
         return data_structure
 
 
+def calculate_sectioned_fsc(
+    image1: np.ndarray,
+    image2: np.ndarray | None = None,
+    *,
+    bin_delta: int = 10,
+    angle_delta: int = 15,
+    extract_angle_delta: float = 0.1,
+    resolution_threshold: str = "fixed",
+    threshold_value: float = 0.143,
+    snr_value: float = 7.0,
+    curve_fit_type: str = "spline",
+    curve_fit_degree: int = 3,
+    disable_hamming: bool = False,
+    z_correction: float = 1.0,
+    disable_3d_sum: bool = False,
+    spacing: float | Sequence[float] = 1.0,
+    zero_padding: bool = True,
+) -> FourierCorrelationDataCollection:
+    """Calculate sectioned FSC for one or two images."""
+
+    single_image = image2 is None
+
+    if isinstance(spacing, (int, float)):
+        spacing = [spacing] * image1.ndim
+    else:
+        spacing = list(spacing)
+
+    image1, image2 = preprocess_images(
+        image1,
+        image2,
+        zero_padding=zero_padding,
+        disable_hamming=disable_hamming,
+        disable_3d_sum=disable_3d_sum,
+    )
+
+    iterator = AxialExcludeSectionedFourierShellIterator(
+        image1.shape,
+        bin_delta,
+        angle_delta,
+        extract_angle_delta,
+    )
+    fsc_task = DirectionalFSC(image1, image2, iterator)
+    data = fsc_task.execute()
+
+    analyzer = FourierCorrelationAnalysis(
+        data,
+        spacing[0],
+        resolution_threshold=resolution_threshold,
+        threshold_value=threshold_value,
+        snr_value=snr_value,
+        curve_fit_type=curve_fit_type,
+        curve_fit_degree=curve_fit_degree,
+    )
+    result = analyzer.execute(z_correction=z_correction)
+
+    # Apply cut-off correction (only for single image case)
+    if single_image:
+        for angle, dataset in result:
+            _apply_cutoff_correction(dataset)
+
+    return result
+
+
+def fsc_resolution(
+    image1: np.ndarray,
+    image2: np.ndarray | None = None,
+    *,
+    bin_delta: int = 10,
+    zero_padding: bool = True,
+    spacing: float | Sequence[float] = 1.0,
+) -> dict[str, float]:
+    """Calculate either single- or two-image FSC-based 3D image resolution."""
+
+    fsc_result = calculate_sectioned_fsc(
+        image1,
+        image2,
+        bin_delta=bin_delta,
+        spacing=spacing,
+        zero_padding=zero_padding,
+    )
+
+    angle_to_resolution = {
+        int(angle): dataset.resolution["resolution"] for angle, dataset in fsc_result
+    }
+
+    return {"xy": angle_to_resolution[0], "z": angle_to_resolution[90]}
+
+
 def grid_crop_resolution(
     image: np.ndarray,
     *,
     bin_delta: int = 1,
-    scales: float | Sequence[float] = 1.0,
+    spacing: float | Sequence[float] = 1.0,
     crop_size: int = 512,
     pad_mode: str = "reflect",
     return_resolution: bool = True,
     aggregate: Callable | None = np.median,
-    verbose: bool = False,
 ) -> dict[str, np.ndarray]:
     """Calculate FRC-based 3D image resolution by tiling and taking 2D slices along XY and XZ."""
     if not return_resolution or aggregate is None:
@@ -421,23 +453,15 @@ def grid_crop_resolution(
     else:
         aggregate_fn = aggregate
 
-    if not isinstance(image, Image):
-        xp = get_array_module(image)
-        ndarray = getattr(xp, "ndarray")  # avoid mypy complains
-        if not isinstance(image, ndarray):
-            raise ValueError(
-                "FRC: incorrect input, should be 2D Image, Numpy or CuPy array."
-            )
+    if isinstance(spacing, (int, float)):
+        spacing = [spacing, spacing, spacing]
 
-        if isinstance(scales, (int, float)):
-            scales = [scales, scales, scales]
-        image = Image(image, scales)
-    assert len(image.shape) == 3 and len(image.spacing) == 3
+    assert len(image.shape) == 3 and len(spacing) == 3
     assert image.shape[0] < image.shape[1] and image.shape[0] < image.shape[2]
     assert image.shape[1] > crop_size and image.shape[2] > crop_size
 
-    scales_xy = (image.spacing[1], image.spacing[2])
-    scales_xz = (image.spacing[0], image.spacing[2])
+    spacing_xy = (spacing[1], spacing[2])
+    spacing_xz = (spacing[0], spacing[2])
 
     locations = get_xy_block_coords(image.shape, crop_size)
 
@@ -445,13 +469,11 @@ def grid_crop_resolution(
     xy_resolutions = []
     xz_resolutions = []
     for y1, y2, x1, x2 in locations:
-        loc_image = image.data[:, y1:y2, x1:x2]
+        loc_image = image[:, y1:y2, x1:x2]
         max_projection_resolution = fsc_resolution(
             loc_image.max(0),
             bin_delta=bin_delta,
-            scales=scales_xy,
-            return_resolution=return_resolution,
-            verbose=verbose,
+            spacing=spacing_xy,
         )
         max_projection_resolutions.append(max_projection_resolution)
 
@@ -464,9 +486,7 @@ def grid_crop_resolution(
                 fsc_resolution(
                     loc_image[slice_idx, :, :],
                     bin_delta=bin_delta,
-                    scales=scales_xy,
-                    return_resolution=return_resolution,
-                    verbose=verbose,
+                    spacing=spacing_xy,
                 )
             )
 
@@ -482,9 +502,7 @@ def grid_crop_resolution(
                 fsc_resolution(
                     padded_xz_slice,
                     bin_delta=bin_delta,
-                    scales=scales_xz,
-                    return_resolution=return_resolution,
-                    verbose=verbose,
+                    spacing=spacing_xz,
                 )
             )
 
@@ -502,12 +520,11 @@ def five_crop_resolution(
     image: np.ndarray,
     *,
     bin_delta: int = 1,
-    scales: float | Sequence[float] = 1.0,
+    spacing: float | Sequence[float] = 1.0,
     crop_size: int = 512,
     pad_mode: str = "reflect",
     return_resolution: bool = True,
     aggregate: Callable = np.median,
-    verbose: bool = False,
 ) -> dict[str, np.ndarray]:
     """Calculate FRC-based 3D image resolution by taking 2D slices along XY and XZ at 4 corners and the center."""
     if not return_resolution or aggregate is None:
@@ -515,15 +532,15 @@ def five_crop_resolution(
     else:
         aggregate_fn = aggregate
 
-    if isinstance(scales, (int, float)):
-        scales = [scales, scales, scales]
+    if isinstance(spacing, (int, float)):
+        spacing = [spacing, spacing, spacing]
 
-    assert len(image.shape) == 3 and len(scales) == 3
+    assert len(image.shape) == 3 and len(spacing) == 3
     assert image.shape[0] < image.shape[1] and image.shape[0] < image.shape[2]
     assert image.shape[1] > crop_size and image.shape[2] > crop_size
 
-    scales_xy = (scales[1], scales[2])
-    scales_xz = (scales[0], scales[2])
+    spacing_xy = (spacing[1], spacing[2])
+    spacing_xz = (spacing[0], spacing[2])
 
     locations = [crop_tl, crop_bl, crop_tr, crop_br, crop_center]
     max_projection_resolutions = []
@@ -535,9 +552,7 @@ def five_crop_resolution(
         max_projection_resolution = fsc_resolution(
             loc_image.max(0),
             bin_delta=bin_delta,
-            scales=scales_xy,
-            return_resolution=return_resolution,
-            verbose=verbose,
+            spacing=spacing_xy,
         )
         max_projection_resolutions.append(max_projection_resolution)
 
@@ -549,9 +564,7 @@ def five_crop_resolution(
                 fsc_resolution(
                     loc_image[slice_idx, :, :],
                     bin_delta=bin_delta,
-                    scales=scales_xy,
-                    return_resolution=return_resolution,
-                    verbose=verbose,
+                    spacing=spacing_xy,
                 )
             )
 
@@ -565,9 +578,7 @@ def five_crop_resolution(
                 fsc_resolution(
                     padded_xz_slice,
                     bin_delta=bin_delta,
-                    scales=scales_xz,
-                    return_resolution=return_resolution,
-                    verbose=verbose,
+                    spacing=spacing_xz,
                 )
             )
 
@@ -585,133 +596,35 @@ def frc_resolution_difference(
     image1: np.ndarray,
     image2: np.ndarray,
     *,
-    scales: float | tuple[float, float] = 1.0,
+    spacing: float | tuple[float, float] = 1.0,
     downscale_xy: bool = False,
     axis: str = "xy",
     frc_bin_delta: int = 3,
     aggregate: Callable = np.mean,
-    verbose: bool = False,
 ) -> float:
     """Calculate difference between FRC-based resulutions of two images."""
-    if isinstance(scales, (int, float)):
-        scales = (scales, scales, scales)
-    if np.any(np.asarray(scales) != 1.0):
+    if isinstance(spacing, (int, float)):
+        spacing = (spacing, spacing, spacing)
+    if np.any(np.asarray(spacing) != 1.0):
         image1 = rescale_isotropic(
-            image1, voxel_sizes=scales, downscale_xy=downscale_xy
+            image1, voxel_sizes=spacing, downscale_xy=downscale_xy
         )
         image2 = rescale_isotropic(
-            image2, voxel_sizes=scales, downscale_xy=downscale_xy
+            image2, voxel_sizes=spacing, downscale_xy=downscale_xy
         )
 
     image1_res = grid_crop_resolution(
         image1,
         bin_delta=frc_bin_delta,
-        scales=scales,
+        spacing=spacing,
         aggregate=aggregate,
-        verbose=verbose,
     )
     image2_res = grid_crop_resolution(
         image2,
         bin_delta=frc_bin_delta,
-        scales=scales,
+        spacing=spacing,
         aggregate=aggregate,
-        verbose=verbose,
     )
     return (
         aggregate(image2_res[axis]) - aggregate(image1_res[axis])
     ) * 1000  # return diff in nm
-
-
-def fsc_resolution(
-    image1: np.ndarray | Image,
-    image2: np.ndarray | Image | None = None,
-    *,
-    bin_delta: int = 10,
-    zero_padding: bool = True,
-    scales: float | Sequence[float] = 1.0,
-    verbose: bool = False,
-):
-    """Calculate either single- or two-image FSC-based 3D image resolution."""
-
-    fsc_result = calculate_sectioned_fsc(
-        image1,
-        image2,
-        bin_delta=bin_delta,
-        verbose=verbose,
-        scales=scales,
-        zero_padding=zero_padding,
-    )
-
-    angle_to_resolution = {
-        int(angle): dataset.resolution["resolution"] for angle, dataset in fsc_result
-    }
-
-    return {"xy": angle_to_resolution[0], "z": angle_to_resolution[90]}
-
-
-def calculate_sectioned_fsc(
-    image1: np.ndarray | Image,
-    image2: np.ndarray | Image | None = None,
-    *,
-    bin_delta: int = 10,
-    angle_delta: int = 15,
-    extract_angle_delta: float = 0.1,
-    resolution_threshold: str = "fixed",
-    threshold_value: float = 0.143,
-    snr_value: float = 7.0,
-    curve_fit_type: str = "spline",
-    curve_fit_degree: int = 3,
-    disable_hamming: bool = False,
-    verbose: bool = False,
-    z_correction: float = 1.0,
-    disable_3d_sum: bool = False,
-    scales: float | Sequence[float] = 1.0,
-    zero_padding: bool = True,
-) -> FourierCorrelationDataCollection:
-    """Calculate sectioned FSC for one or two images."""
-
-    single_image = image2 is None
-
-    img_cubes = (image1,) if image2 is None else (image1, image2)
-    img_cubes = preprocess_images(img_cubes, scales, zero_padding, verbose)
-
-    image1 = img_cubes[0]
-    if single_image:
-        assert all(s == image1.shape[0] for s in image1.shape)
-        image1, image2 = frc_checkerboard_split(image1, disable_3d_sum=disable_3d_sum)
-    else:
-        image2 = img_cubes[1]
-        assert isinstance(image2, Image)
-
-    if not disable_hamming:
-        image1 = Image(hamming_window(image1.data), image1.spacing)
-        image2 = Image(hamming_window(image2.data), image2.spacing)
-
-    # Create iterator and calculate FSC
-    iterator = AxialExcludeSectionedFourierShellIterator(
-        image1.shape,
-        bin_delta,
-        angle_delta,
-        extract_angle_delta,
-    )
-    fsc_task = DirectionalFSC(image1.data, image2.data, iterator)
-    data = fsc_task.execute()
-
-    analyzer = FourierCorrelationAnalysis(
-        data,
-        image1.spacing[0],
-        resolution_threshold=resolution_threshold,
-        threshold_value=threshold_value,
-        snr_value=snr_value,
-        curve_fit_type=curve_fit_type,
-        curve_fit_degree=curve_fit_degree,
-        verbose=verbose,
-    )
-    result = analyzer.execute(z_correction=z_correction)
-
-    # Apply cut-off correction (only for single image case)
-    if single_image:
-        for angle, dataset in result:
-            _apply_cutoff_correction(dataset)
-
-    return result
