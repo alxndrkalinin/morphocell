@@ -17,21 +17,33 @@ CPU based approaches.
 * Optional: TensorFlow/Flowdec for deconvolution, Cellpose for segmentation
 
 ### Installation
-The project can be installed from source as follows:
+Clone the repository and install the base library:
 
 ```bash
 git clone https://github.com/alxndrkalinin/morphocell.git
 cd morphocell
-pip install -e .[all]
+pip install -e .
+```
+
+Optional extras from `pyproject.toml` enable additional functionality:
+
+```bash
+# GPU accelerated deconvolution
+pip install -e '.[decon]'
+# resolution metrics
+pip install -e '.[frc]'
+# segmentation via Cellpose
+pip install -e '.[cellpose]'
+# install everything
+pip install -e '.[all]'
 ```
 
 ### Testing
-Run the code style and type checks using
+Run style checks and tests using `pre-commit` and `pytest`:
 
 ```bash
-ruff check .
-ruff format --check .
-mypy --ignore-missing-imports morphocell/
+pre-commit run --all-files
+pytest
 ```
 
 ### Contributing

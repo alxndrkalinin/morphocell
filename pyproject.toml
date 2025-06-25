@@ -45,6 +45,10 @@ decon = [
     "cloudpickle>=2.0",
     "py3nvml>=0.2.6",
 ]
+dev = [
+    "pre-commit",
+    "pytest",
+]
 frc = [
     "miplib @ git+https://github.com/alxndrkalinin/miplib@public",
 ]
