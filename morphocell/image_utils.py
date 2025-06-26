@@ -282,10 +282,11 @@ def random_crop(
     x1, y1, x2, y2 = get_random_crop_coords(
         height, width, crop_h, crop_w, h_start, w_start
     )
+    cropped = img[:, y1:y2, x1:x2] if img.ndim > 2 else img[y1:y2, x1:x2]
     if return_coordinates:
-        return (img[y1:y2, x1:x2], (y1, y2, x1, x2))
+        return (cropped, (y1, y2, x1, x2))
     else:
-        return img[y1:y2, x1:x2]
+        return cropped
 
 
 def crop_to_divisor(
