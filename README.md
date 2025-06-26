@@ -34,6 +34,8 @@ pip install -e '.[decon]'
 pip install -e '.[frc]'
 # segmentation via Cellpose
 pip install -e '.[cellpose]'
+# developer tools (pre-commit, pytest)
+pip install -e '.[dev]'
 # install everything
 pip install -e '.[all]'
 ```
@@ -47,8 +49,16 @@ pytest
 ```
 
 ### Contributing
-Contributions and bug reports are welcome. Please open an issue or pull request
-on GitHub.
+Contributions and bug reports are welcome. Install development dependencies and
+set up pre-commit hooks:
+
+```bash
+pip install -e '.[dev]'
+pre-commit install
+```
+
+Pre-commit will then run style checks automatically. Please open an issue or
+pull request on GitHub.
 
 ## Usage
 See the example notebooks in `examples/notebooks/` for demonstrations of
