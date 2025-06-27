@@ -66,16 +66,15 @@ def make_fake_cells3d(
 
 
 @pytest.fixture(scope="module")
-def cells_volume() -> tuple[np.ndarray, list[float], bool]:
-    """Return single-channel cells3d volume and spacing or indicate fallback."""
+def cells_volume() -> tuple[np.ndarray, list[float]]:
+    """Return single-channel cells3d volume and spacing or a synthetic fallback."""
     try:
         volume = data.cells3d()[:, 1]
         spacing = [0.29, 0.26, 0.26]
-        return volume, spacing, True
     except Exception:
         volume = make_fake_cells3d(shape=(32, 64, 64), random_seed=42)
         spacing = [1.0, 1.0, 1.0]
-        return volume, spacing, False
+    return volume, spacing
 
 
 def _gpu_available() -> bool:
@@ -98,11 +97,9 @@ def _assert_positive(result: Any) -> None:
 
 
 def test_calculate_frc_cpu_vs_gpu(
-    cells_volume: tuple[np.ndarray, list[float], bool],
+    cells_volume: tuple[np.ndarray, list[float]],
 ) -> None:
-    volume, spacing, real_data = cells_volume
-    if not real_data:
-        pytest.skip("cells3d dataset unavailable")
+    volume, spacing = cells_volume
     slice_image = _middle_slice(volume)
 
     # Use 2D spacing (xy only)
@@ -117,14 +114,12 @@ def test_calculate_frc_cpu_vs_gpu(
 
 
 def test_calculate_fsc_cpu_vs_gpu(
-    cells_volume: tuple[np.ndarray, list[float], bool],
+    cells_volume: tuple[np.ndarray, list[float]],
 ) -> None:
-    volume, spacing, real_data = cells_volume
-    if not real_data:
-        pytest.skip("cells3d dataset unavailable")
+    volume, spacing = cells_volume
 
     rng = np.random.default_rng(42)
-    noisy_volume = volume.astype(np.float32) + rng.normal(0, 0.1, volume.shape).astype(
+    noisy_volume = volume.astype(np.float32) + rng.normal(0, 0.5, volume.shape).astype(
         np.float32
     )
 
