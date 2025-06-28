@@ -72,7 +72,7 @@ def cast_to_dtype(
     else:
         data_max = data.max()
         data_min = data.min()
-        print("Warning casting into unknown data type. Detail clippingmay occur")
+        print("Warning casting into unknown data type. Detail clipping may occur")
 
     # In case of unsigned integers, numbers below zero need to be clipped
     if "uint" in str(dtype):
