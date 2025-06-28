@@ -44,13 +44,11 @@ def downscale_and_filter(
         "circular",
     ], "Filter shape must be 'square' or 'circular'."
 
-    image_np = np.asarray(image)
-
-    if image_np.ndim == 2:
+    if image.ndim == 2:
         skimage_footprint = (
             morphology.square if filter_shape == "square" else morphology.disk
         )
-    elif image_np.ndim == 3:
+    elif image.ndim == 3:
         skimage_footprint = (
             morphology.cube if filter_shape == "square" else morphology.ball
         )
@@ -58,11 +56,9 @@ def downscale_and_filter(
         raise ValueError("Image must be 2D or 3D.")
 
     if downscale_factor < 1.0:
-        image_np = transform.rescale(
-            image_np, downscale_factor, order=3, anti_aliasing=True
-        )
+        image = transform.rescale(image, downscale_factor, order=3, anti_aliasing=True)
 
-    return filters.median(image_np, footprint=skimage_footprint(filter_size))
+    return filters.median(image, footprint=skimage_footprint(filter_size))
 
 
 def check_labeled_binary(image):
