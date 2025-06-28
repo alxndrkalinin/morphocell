@@ -258,11 +258,11 @@ def segment_watershed(image, ball_size=15):
     )
 
     mask = np.zeros(distance.shape, dtype=bool)
-    mask[tuple(coords.T)] = True
-    markers = label(mask)
+    mask[tuple(asnumpy(coords.T))] = True
+    markers = label(asnumpy(mask))
 
     # https://github.com/rapidsai/cucim/issues/89
-    labels = watershed(-asnumpy(distance), asnumpy(markers), mask=asnumpy(image))
+    labels = watershed(-asnumpy(distance), markers, mask=asnumpy(image))
     # return in the format and on the same device as input
     return to_device(labels, device)
 
