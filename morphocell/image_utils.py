@@ -75,7 +75,7 @@ def normalize_min_max(
 ) -> np.ndarray:
     """Normalize image intensities between percentiles."""
     vmin, vmax = np.percentile(img, q=q)
-    return exposure.rescale_intensity(img, in_range=(vmin, vmax), out_range=np.float32)
+    return exposure.rescale_intensity(img, in_range=(float(vmin), float(vmax)), out_range=np.float32)
 
 
 def img_mse(
