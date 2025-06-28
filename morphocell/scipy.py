@@ -26,7 +26,10 @@ class SciPyProxy(ModuleType):
 
         def func_wrapper(*args: Any, **kwargs: Any) -> Any:
             array = args[0] if args else kwargs.get("input", None)
-            use_gpu = self.cp is not None and hasattr(array, "device")
+            use_gpu = False
+            if self.cp is not None and hasattr(array, "device"):
+                device_val = getattr(array, "device", None)
+                use_gpu = hasattr(device_val, "id") or (isinstance(device_val, str) and device_val != "cpu")
             base_module = "cupyx.scipy" if use_gpu else "scipy"
             module_name = f"{base_module}.{self.__name__}"
 
