@@ -18,6 +18,8 @@ from ..skimage import transform, filters, morphology, feature
 def downscale_and_filter(
     image: npt.ArrayLike,
     downscale_factor: float = 0.5,
+    downscale_order: int = 3,
+    downscale_anti_aliasing: bool = True,
     filter_size: int = 3,
     filter_shape: str = "square",
 ) -> npt.ArrayLike:
@@ -56,7 +58,7 @@ def downscale_and_filter(
         raise ValueError("Image must be 2D or 3D.")
 
     if downscale_factor < 1.0:
-        image = transform.rescale(image, downscale_factor, order=3, anti_aliasing=True)
+        image = transform.rescale(image, downscale_factor, order=downscale_order, anti_aliasing=downscale_anti_aliasing)
 
     return filters.median(image, footprint=skimage_footprint(filter_size))
 
