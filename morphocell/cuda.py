@@ -105,7 +105,9 @@ def asnumpy(array: np.ndarray) -> np.ndarray:
         return np.asarray(array)
     elif cp is not None and hasattr(array, "device"):
         device_val = getattr(array, "device", None)
-        if hasattr(device_val, "id") or (isinstance(device_val, str) and device_val != "cpu"):
+        if hasattr(device_val, "id") or (
+            isinstance(device_val, str) and device_val != "cpu"
+        ):
             return cp.asnumpy(array)
     return np.asarray(array)
 
