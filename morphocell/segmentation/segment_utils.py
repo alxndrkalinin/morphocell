@@ -99,7 +99,6 @@ def cleanup_segmentation(
     max_hole_size: Optional[int] = None,
 ) -> npt.ArrayLike:
     """Clean up segmented image by removing small objects, clearing borders, and closing holes."""
-    label_img = np.asarray(label_image)
     check_labeled_binary(label_img)
 
     # first 3 transforms preserve labels
