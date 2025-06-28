@@ -92,7 +92,7 @@ def check_labeled_binary(image):
 
 
 def cleanup_segmentation(
-    label_image: npt.ArrayLike,
+    label_img: npt.ArrayLike,
     min_obj_size: Optional[int] = None,
     max_obj_size: Optional[int] = None,
     border_buffer_size: Optional[int] = None,
