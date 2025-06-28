@@ -29,7 +29,9 @@ class SciPyProxy(ModuleType):
             use_gpu = False
             if self.cp is not None and hasattr(array, "device"):
                 device_val = getattr(array, "device", None)
-                use_gpu = hasattr(device_val, "id") or (isinstance(device_val, str) and device_val != "cpu")
+                use_gpu = hasattr(device_val, "id") or (
+                    isinstance(device_val, str) and device_val != "cpu"
+                )
             base_module = "cupyx.scipy" if use_gpu else "scipy"
             module_name = f"{base_module}.{self.__name__}"
 

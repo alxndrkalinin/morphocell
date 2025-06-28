@@ -30,7 +30,9 @@ class SkimageProxy(ModuleType):
 
             if self.cp is not None and hasattr(array, "device"):
                 device_val = getattr(array, "device", None)
-                if hasattr(device_val, "id") or (isinstance(device_val, str) and device_val != "cpu"):
+                if hasattr(device_val, "id") or (
+                    isinstance(device_val, str) and device_val != "cpu"
+                ):
                     base_module = "cucim.skimage"
 
             full_func_name = f"{base_module}.{self.__name__}.{func_name}"
