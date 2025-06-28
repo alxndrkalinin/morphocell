@@ -185,7 +185,7 @@ class FourierRingIterator:
     def get_points_on_ring(self, ring_start: int, ring_stop: int) -> np.ndarray:
         arr_inf = self.r >= ring_start
         arr_sup = self.r < ring_stop
-        return arr_inf * arr_sup
+        return np.logical_and(arr_inf, arr_sup)
 
     def __iter__(self) -> "FourierRingIterator":
         return self
