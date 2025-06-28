@@ -20,9 +20,8 @@ from morphocell.image_utils import (
     reverse_checkerboard_split,
 )
 
-from .frc_utils import (
-    FourierRingIterator,
-    AxialExcludeSectionedFourierShellIterator,
+from .iterators import FourierRingIterator, AxialExcludeSectionedFourierShellIterator
+from .analysis import (
     FourierCorrelationData,
     FourierCorrelationDataCollection,
     FourierCorrelationAnalysis,
