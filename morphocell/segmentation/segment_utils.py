@@ -58,7 +58,12 @@ def downscale_and_filter(
         raise ValueError("Image must be 2D or 3D.")
 
     if downscale_factor < 1.0:
-        image = transform.rescale(image, downscale_factor, order=downscale_order, anti_aliasing=downscale_anti_aliasing)
+        image = transform.rescale(
+            image,
+            downscale_factor,
+            order=downscale_order,
+            anti_aliasing=downscale_anti_aliasing,
+        )
 
     return filters.median(image, footprint=skimage_footprint(filter_size))
 

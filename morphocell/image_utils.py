@@ -28,6 +28,7 @@ def image_stats(
 def rescale_xy(
     img: np.ndarray,
     scale: float = 1.0,
+    order: int = 3,
     anti_aliasing: bool = True,
     preserve_range: bool = False,
 ) -> np.ndarray:
@@ -35,7 +36,11 @@ def rescale_xy(
     scale_by = scale if img.ndim == 2 else (1.0, scale, scale)
     return_dtype = img.dtype if preserve_range else np.float32
     return transform.rescale(
-        img, scale_by, preserve_range=preserve_range, anti_aliasing=anti_aliasing
+        img,
+        scale_by,
+        order=order,
+        preserve_range=preserve_range,
+        anti_aliasing=anti_aliasing,
     ).astype(return_dtype)
 
 
@@ -75,7 +80,9 @@ def normalize_min_max(
 ) -> np.ndarray:
     """Normalize image intensities between percentiles."""
     vmin, vmax = np.percentile(img, q=q)
-    return exposure.rescale_intensity(img, in_range=(float(vmin), float(vmax)), out_range=np.float32)
+    return exposure.rescale_intensity(
+        img, in_range=(float(vmin), float(vmax)), out_range=np.float32
+    )
 
 
 def img_mse(
