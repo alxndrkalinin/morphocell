@@ -263,14 +263,17 @@ def segment_watershed(image, markers=None, ball_size=15):
         distance, footprint=morphology.ball(ball_size), labels=image
     )
 
+    # https://github.com/rapidsai/cucim/issues/89
     if markers is None:
         mask = np.zeros(distance.shape, dtype=bool)
         mask[tuple(asnumpy(coords.T))] = True
         markers = label(mask)
-
-    # https://github.com/rapidsai/cucim/issues/89
-    labels = watershed(-asnumpy(distance), markers, mask=asnumpy(image))
-    # return in the format and on the same device as input
+        labels = watershed(-asnumpy(distance), markers, mask=asnumpy(image))
+    else:
+        labels = watershed(
+            asnumpy(image), markers=asnumpy(markers), mask=asnumpy(image)
+        )
+    # return on the same device as input
     return to_device(labels, device)
 
 
