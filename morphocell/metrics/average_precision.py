@@ -30,9 +30,9 @@ def _label_overlap_gpu(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     from cupyx import jit
     import warnings
 
-    x = x.ravel()
-    y = y.ravel()
-    overlap = np.zeros((1 + int(x.max()), 1 + int(y.max())), dtype=np.uint)
+    x = x.ravel().astype(np.uint32)
+    y = y.ravel().astype(np.uint32)
+    overlap = np.zeros((1 + int(x.max()), 1 + int(y.max())), dtype=np.uint32)
     overlap = ascupy(overlap)  # type: ignore[assignment]
 
     with warnings.catch_warnings():
@@ -46,7 +46,7 @@ def _label_overlap_gpu(x: np.ndarray, y: np.ndarray) -> np.ndarray:
             if idx < N:
                 jit.atomic_add(overlap, (x[idx], y[idx]), 1)
 
-    N = x.size
+    N = np.uint32(x.size)
     threads_per_block = 128
     blocks_per_grid = (N + threads_per_block - 1) // threads_per_block
     label_overlap_kernel[blocks_per_grid, threads_per_block](x, y, overlap, N)
