@@ -53,7 +53,7 @@ class CUDAManager:
 def get_device(array: np.ndarray) -> str:
     """Return current image device."""
     cp = CUDAManager().get_cp()
-    if cp is not None and hasattr(array, "device"):
+    if cp is not None and hasattr(array, "device") and array.device != "cpu":
         return "GPU"
     return "CPU"
 
