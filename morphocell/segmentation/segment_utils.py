@@ -254,7 +254,7 @@ def remove_thin_objects(label_image, min_z=2):
     return label_image
 
 
-def segment_watershed(image, ball_size=15):
+def segment_watershed(image, markers=None, ball_size=15):
     """Segment image using watershed algorithm."""
     device = get_device(image)
 
@@ -263,9 +263,10 @@ def segment_watershed(image, ball_size=15):
         distance, footprint=morphology.ball(ball_size), labels=image
     )
 
-    mask = np.zeros(distance.shape, dtype=bool)
-    mask[tuple(asnumpy(coords.T))] = True
-    markers = label(mask)
+    if markers is None:
+        mask = np.zeros(distance.shape, dtype=bool)
+        mask[tuple(asnumpy(coords.T))] = True
+        markers = label(mask)
 
     # https://github.com/rapidsai/cucim/issues/89
     labels = watershed(-asnumpy(distance), markers, mask=asnumpy(image))
