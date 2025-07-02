@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "morphocell"
 dynamic = ["version"]
-description = "Morphometric analysis of nD bioimages with CUDA support"
+description = "CUDA-accelerated 3D BioImage Computing"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -25,7 +25,6 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -38,25 +37,24 @@ Homepage = "https://github.com/alxndrkalinin/morphocell"
 Repository = "https://github.com/alxndrkalinin/morphocell"
 
 [project.optional-dependencies]
-deconv = [
-    "tensorflow-gpu>=1.14.0,<2.2.1",
-    "flowdec[tf_gpu]>=1.1.0",
-    "pyvirtualdisplay>=2.0",
-    "cloudpickle>=2.0",
-    "py3nvml>=0.2.6",
-]
 cellpose = [
-    "cellpose>=0.6.0",
+    "cellpose>=2.0,<4.0",
 ]
 dev = [
     "ruff",
     "mypy",
     "pooch",
     "pytest",
+    "pre-commit",
+]
+flowdec = [
+    "tensorflow-gpu>=1.14.0,<2.2.1",
+    "flowdec[tf_gpu]>=1.1.0",
+    "pyvirtualdisplay>=2.0",
+    "cloudpickle>=2.0",
+    "py3nvml>=0.2.6",
 ]
 all = [
-    "morphocell[deconv]",
-    "morphocell[frc]",
     "morphocell[cellpose]",
     "morphocell[dev]",
 ]
@@ -69,15 +67,3 @@ exclude = ["examples*"]
 
 [tool.mypy]
 python_version = "3.10"
-
-[[tool.mypy.overrides]]
-module = "morphocell.metrics.frc.frc"
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "morphocell.preprocessing.deconvolution"
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "morphocell.segmentation.segment_utils"
-ignore_errors = true
