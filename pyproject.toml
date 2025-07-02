@@ -15,7 +15,6 @@ authors = [
 dependencies = [
     "numpy>=1.20.0",
     "scikit-image>=0.16.1",
-    "trimesh>=3.3.0",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -54,9 +53,13 @@ flowdec = [
     "cloudpickle>=2.0",
     "py3nvml>=0.2.6",
 ]
+mesh = [
+    "trimesh>=3.3.0",
+]
 all = [
     "morphocell[cellpose]",
     "morphocell[dev]",
+    "morphocell[mesh]",
 ]
 
 [tool.setuptools.dynamic]

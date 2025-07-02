@@ -1,15 +1,33 @@
 """Extract features from a label image using trimesh."""
 
+from __future__ import annotations
+
 import warnings
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
 
 import numpy as np
-import trimesh
 from skimage.measure import marching_cubes
-from trimesh.curvature import (
-    discrete_gaussian_curvature_measure,
-    discrete_mean_curvature_measure,
-)
+
+try:  # pragma: no cover - optional dependency
+    import trimesh  # type: ignore
+    from trimesh.curvature import (
+        discrete_gaussian_curvature_measure,
+        discrete_mean_curvature_measure,
+    )
+
+    _TRIMESH_AVAILABLE = True
+except Exception:  # pragma: no cover - optional dependency
+    trimesh = None  # type: ignore[assignment]
+    discrete_gaussian_curvature_measure = None  # type: ignore[assignment]
+    discrete_mean_curvature_measure = None  # type: ignore[assignment]
+    _TRIMESH_AVAILABLE = False
+    warnings.warn(
+        "trimesh is not installed. Mesh feature extraction is unavailable.",
+        RuntimeWarning,
+    )
+
+if TYPE_CHECKING:  # pragma: no cover - typing guard
+    import trimesh as _trimesh
 
 from ..cuda import asnumpy
 
@@ -44,10 +62,17 @@ def extract_features(
     label_image: np.ndarray, features: Optional[list[str]] = None
 ) -> tuple[np.ndarray, np.ndarray]:
     """Extract features from a label image using trimesh."""
+    features = features or mesh_feature_list()
+    if not _TRIMESH_AVAILABLE:
+        warnings.warn(
+            "trimesh is required for mesh feature extraction. Install with 'pip install morphocell[mesh]'.",
+            RuntimeWarning,
+        )
+        return np.array([], dtype=int), np.zeros((0, len(features)))
+
     label_image = asnumpy(label_image)
     labels = np.unique(label_image)
 
-    features = features or mesh_feature_list()
     feature_values = []
     for label in labels:
         mask = label_image == label
@@ -59,14 +84,30 @@ def extract_features(
 
 def extract_surface_features(mask: np.ndarray) -> dict[str, float]:
     """Generate mesh from a single label mask and extract its surface features."""
+    if not _TRIMESH_AVAILABLE:
+        warnings.warn(
+            "trimesh is required for mesh feature extraction. Install with 'pip install morphocell[mesh]'.",
+            RuntimeWarning,
+        )
+        return {}
+
     mesh = mask2mesh(mask)
+    if mesh is None:
+        return {}
+
     return extract_mesh_features(mesh)
 
 
 def mask2mesh(
     mask_3d: np.ndarray, marching_cubes_kwargs: Optional[dict[str, Any]] = None
-) -> trimesh.Trimesh:
+) -> _trimesh.Trimesh | None:
     """Convert 3D mask to a mesh using marching cubes."""
+    if not _TRIMESH_AVAILABLE:
+        warnings.warn(
+            "trimesh is required for mesh feature extraction. Install with 'pip install morphocell[mesh]'.",
+            RuntimeWarning,
+        )
+        return None
     marching_cubes_kwargs = marching_cubes_kwargs or {}
     verts, faces, _, _ = marching_cubes(mask_3d, **marching_cubes_kwargs)
     mesh = trimesh.Trimesh(vertices=verts, faces=faces)
@@ -79,8 +120,15 @@ def ellipsoid_sphericity(v: float, sa: float) -> float:
     return np.power(np.pi, 1 / 3) * np.power(6 * v, 2 / 3) / sa
 
 
-def extract_mesh_features(mesh: trimesh.Trimesh) -> dict[str, float]:
+def extract_mesh_features(mesh: _trimesh.Trimesh) -> dict[str, float]:
     """Extract surface features from a trimesh object."""
+    if not _TRIMESH_AVAILABLE:
+        warnings.warn(
+            "trimesh is required for mesh feature extraction. Install with 'pip install morphocell[mesh]'.",
+            RuntimeWarning,
+        )
+        return {}
+
     axis_len = sorted(mesh.extents)
     intertia_pcs = mesh.principal_inertia_components
     volume = mesh.volume
