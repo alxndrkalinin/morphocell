@@ -38,7 +38,7 @@ Homepage = "https://github.com/alxndrkalinin/morphocell"
 Repository = "https://github.com/alxndrkalinin/morphocell"
 
 [project.optional-dependencies]
-decon = [
+deconv = [
     "tensorflow-gpu>=1.14.0,<2.2.1",
     "flowdec[tf_gpu]>=1.1.0",
     "pyvirtualdisplay>=2.0",
@@ -49,16 +49,20 @@ dev = [
     "pre-commit",
     "pytest",
 ]
-frc = [
-    "miplib @ git+https://github.com/alxndrkalinin/miplib@public",
-]
 cellpose = [
     "cellpose>=0.6.0",
 ]
+dev = [
+    "ruff",
+    "mypy",
+    "pooch",
+    "pytest",
+]
 all = [
-    "morphocell[decon]",
+    "morphocell[deconv]",
     "morphocell[frc]",
     "morphocell[cellpose]",
+    "morphocell[dev]",
 ]
 
 [tool.setuptools.dynamic]
@@ -66,3 +70,18 @@ version = { attr = "morphocell.__version__" }
 
 [tool.setuptools.packages.find]
 exclude = ["examples*"]
+
+[tool.mypy]
+python_version = "3.10"
+
+[[tool.mypy.overrides]]
+module = "morphocell.metrics.frc.frc"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "morphocell.preprocessing.deconvolution"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "morphocell.segmentation.segment_utils"
+ignore_errors = true

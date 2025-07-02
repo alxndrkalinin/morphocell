@@ -28,6 +28,7 @@ def image_stats(
 def rescale_xy(
     img: np.ndarray,
     scale: float = 1.0,
+    order: int = 3,
     anti_aliasing: bool = True,
     preserve_range: bool = False,
 ) -> np.ndarray:
@@ -35,7 +36,11 @@ def rescale_xy(
     scale_by = scale if img.ndim == 2 else (1.0, scale, scale)
     return_dtype = img.dtype if preserve_range else np.float32
     return transform.rescale(
-        img, scale_by, preserve_range=preserve_range, anti_aliasing=anti_aliasing
+        img,
+        scale_by,
+        order=order,
+        preserve_range=preserve_range,
+        anti_aliasing=anti_aliasing,
     ).astype(return_dtype)
 
 
@@ -75,7 +80,9 @@ def normalize_min_max(
 ) -> np.ndarray:
     """Normalize image intensities between percentiles."""
     vmin, vmax = np.percentile(img, q=q)
-    return exposure.rescale_intensity(img, in_range=(vmin, vmax), out_range=np.float32)
+    return exposure.rescale_intensity(
+        img, in_range=(float(vmin), float(vmax)), out_range=np.float32
+    )
 
 
 def img_mse(
@@ -138,7 +145,7 @@ def pad_image_to_shape(
     return img
 
 
-def pad_images_to_matching_shape(
+def pad_to_matching_shape(
     img1: np.ndarray, img2: np.ndarray, mode: str = "constant"
 ) -> tuple[np.ndarray, np.ndarray]:
     """Apply zero padding to make the size of two Images match."""
@@ -326,9 +333,24 @@ def crop_to_divisor(
         )
 
 
+def rotate_image(
+    image: np.ndarray, angle: float, interpolation: str = "nearest"
+) -> np.ndarray:
+    """Rotate 3D image around the Z axis by ``angle`` degrees."""
+    xp = get_array_module(image)
+    order = 1 if interpolation == "linear" else 0
+    if xp.__name__ == np.__name__:
+        from scipy.ndimage import rotate
+    else:
+        from cupyx.scipy.ndimage import rotate  # type: ignore
+    return rotate(
+        image, angle, axes=(1, 2), reshape=False, order=order, mode="constant"
+    )
+
+
 def get_xy_block_coords(
     image_shape: Sequence[int], crop_hw: int | tuple[int, int]
-) -> npt.ArrayLike:
+) -> np.ndarray:
     """Compute coordinates of non-overlapping image blocks of specified shape."""
     crop_h, crop_w = (crop_hw, crop_hw) if isinstance(crop_hw, int) else crop_hw
     height, width = image_shape[1:]
@@ -336,8 +358,10 @@ def get_xy_block_coords(
     block_coords = []  # type: list[tuple[int, ...]]
     for y in np.arange(0, height // crop_h) * crop_h:
         block_coords.extend(
-            (y, y + crop_h, x, x + crop_w)
-            for x in np.arange(0, width // crop_w) * crop_w
+            [
+                (int(y), int(y + crop_h), int(x), int(x + crop_w))
+                for x in np.arange(0, width // crop_w) * crop_w
+            ]
         )
 
     return np.asarray(block_coords).astype(int)

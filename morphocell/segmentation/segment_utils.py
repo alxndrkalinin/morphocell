@@ -18,6 +18,8 @@ from ..skimage import transform, filters, morphology, feature
 def downscale_and_filter(
     image: npt.ArrayLike,
     downscale_factor: float = 0.5,
+    downscale_order: int = 3,
+    downscale_anti_aliasing: bool = True,
     filter_size: int = 3,
     filter_shape: str = "square",
 ) -> npt.ArrayLike:
@@ -56,7 +58,12 @@ def downscale_and_filter(
         raise ValueError("Image must be 2D or 3D.")
 
     if downscale_factor < 1.0:
-        image = transform.rescale(image, downscale_factor, order=3, anti_aliasing=True)
+        image = transform.rescale(
+            image,
+            downscale_factor,
+            order=downscale_order,
+            anti_aliasing=downscale_anti_aliasing,
+        )
 
     return filters.median(image, footprint=skimage_footprint(filter_size))
 
@@ -85,38 +92,36 @@ def check_labeled_binary(image):
 
 
 def cleanup_segmentation(
-    label_image: npt.ArrayLike,
+    label_img: npt.ArrayLike,
     min_obj_size: Optional[int] = None,
     max_obj_size: Optional[int] = None,
     border_buffer_size: Optional[int] = None,
     max_hole_size: Optional[int] = None,
 ) -> npt.ArrayLike:
     """Clean up segmented image by removing small objects, clearing borders, and closing holes."""
-    check_labeled_binary(label_image)
+    check_labeled_binary(label_img)
 
     # first 3 transforms preserve labels
     if min_obj_size is not None:
         # min_obj_size = to_device(min_obj_size, get_device(label_image))
-        label_image = morphology.remove_small_objects(
-            label_image, min_size=min_obj_size
-        )
+        label_img = morphology.remove_small_objects(label_img, min_size=min_obj_size)
 
     if max_obj_size is not None:
-        label_image = remove_large_objects(label_image, max_size=max_obj_size)
+        label_img = remove_large_objects(label_img, max_size=max_obj_size)
 
     if border_buffer_size is not None:
-        label_image = clear_xy_borders(label_image, buffer_size=border_buffer_size)
+        label_img = clear_xy_borders(label_img, buffer_size=border_buffer_size)
 
     # returns boolean array
     if max_hole_size is not None:
-        for label_id in np.unique(label_image)[1:]:
-            mask = label_image == label_id
+        for label_id in np.unique(label_img)[1:]:
+            mask = label_img == label_id
             filled_mask = morphology.remove_small_holes(
                 mask, area_threshold=max_hole_size
             )
-            label_image[filled_mask] = label_id
+            label_img[filled_mask] = label_id
 
-    return label(label_image).astype(np.uint8)
+    return label(label_img).astype(np.uint8)
 
 
 def find_objects(label_image, max_label=None):
@@ -249,7 +254,7 @@ def remove_thin_objects(label_image, min_z=2):
     return label_image
 
 
-def segment_watershed(image, ball_size=15):
+def segment_watershed(image, markers=None, ball_size=15):
     """Segment image using watershed algorithm."""
     device = get_device(image)
 
@@ -258,12 +263,17 @@ def segment_watershed(image, ball_size=15):
         distance, footprint=morphology.ball(ball_size), labels=image
     )
 
-    mask = np.zeros(distance.shape, dtype=bool)
-    mask[tuple(asnumpy(coords.T))] = True
-    markers = label(mask)
-
-    labels = watershed(-asnumpy(distance), markers, mask=asnumpy(image))
-    # return in the format and on the same device as input
+    # https://github.com/rapidsai/cucim/issues/89
+    if markers is None:
+        mask = np.zeros(distance.shape, dtype=bool)
+        mask[tuple(asnumpy(coords.T))] = True
+        markers = label(mask)
+        labels = watershed(-asnumpy(distance), markers, mask=asnumpy(image))
+    else:
+        labels = watershed(
+            asnumpy(image), markers=asnumpy(markers), mask=asnumpy(image)
+        )
+    # return on the same device as input
     return to_device(labels, device)
 
 
@@ -322,14 +332,15 @@ def fill_holes_slicer(
 
     Inspired by: https://github.com/True-North-Intelligent-Algorithms/tnia-python/blob/main/tnia/morphology/fill_holes.py
     """
-    axes = range(image.ndim) if axes is None else axes
+    img = np.asarray(image)
+    axes = range(img.ndim) if axes is None else axes
 
-    for label_id in np.unique(image)[1:]:
-        binary = image == label_id
+    for label_id in np.unique(img)[1:]:
+        binary = img == label_id
 
         for _ in range(num_iterations):
             for axis in axes:
-                slicers = [slice(None)] * image.ndim
+                slicers = [slice(None)] * img.ndim
                 for i in range(binary.shape[axis]):
                     slicers[axis] = slice(i, i + 1)
                     binary_slice = binary[tuple(slicers)]
@@ -342,6 +353,6 @@ def fill_holes_slicer(
                         )
                     binary[tuple(slicers)] = filled_slice
 
-        image[binary] = label_id
+        img[binary] = label_id
 
-    return image
+    return img
