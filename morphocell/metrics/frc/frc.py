@@ -67,8 +67,10 @@ def preprocess_images(
         )
     else:
         # Apply padding to second image
-        if len(set(image2.shape)) > 1 and zero_padding:
+        if image2 is not None and len(set(image2.shape)) > 1 and zero_padding:
             image2 = pad_image_to_cube(image2)
+
+    assert image2 is not None
 
     # Apply Hamming windowing to both images independently
     if not disable_hamming:
