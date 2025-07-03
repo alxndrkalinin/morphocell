@@ -234,7 +234,7 @@ def richardson_lucy_skimage(
     clip: bool = True,
     filter_epsilon: Optional[float] = None,
 ) -> np.ndarray:
-    """Iterative Lucy-Richardson deconvolution using scikit-image."""
+    """Lucy-Richardson deconvolution using :mod:`morphocell.skimage`."""
     xp = get_array_module(image)
     if xp is not get_array_module(psf):
         raise ValueError("image and psf must reside on the same device")
@@ -242,27 +242,18 @@ def richardson_lucy_skimage(
     float_type = _supported_float_type(image.dtype)
     image = xp.asarray(image, dtype=float_type)
     psf = xp.asarray(psf, dtype=float_type)
-    estimate = xp.full(image.shape, 0.5, dtype=float_type)
-    psf_mirror = xp.flip(psf)
-    eps = 1e-12
 
-    if xp.__name__ == "cupy":
-        from cupyx.scipy.signal import convolve
-    else:
-        from scipy.signal import convolve
+    estimate = restoration.richardson_lucy(
+        image,
+        psf,
+        num_iter=n_iter,
+        clip=clip,
+        filter_epsilon=filter_epsilon,
+    )
 
-    for i in range(1, n_iter + 1):
-        conv = convolve(estimate, psf, mode="same") + eps
-        if filter_epsilon:
-            relative_blur = xp.where(conv < filter_epsilon, 0, image / conv)
-        else:
-            relative_blur = image / conv
-        estimate *= convolve(relative_blur, psf_mirror, mode="same")
-        if observer_fn is not None:
-            observer_fn(estimate, i)
+    if observer_fn is not None:
+        observer_fn(estimate, n_iter)
 
-    if clip:
-        estimate = xp.clip(estimate, -1, 1)
     return estimate
 
 
