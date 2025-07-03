@@ -1,6 +1,6 @@
 """Implements 2D/3D Fourier Ring/Shell Correlation."""
 
-from typing import Sequence, Callable
+from typing import Sequence, Callable, Any, cast
 
 import numpy as np
 
@@ -28,7 +28,7 @@ from .analysis import (
 )
 
 
-def _empty_aggregate(*args: np.ndarray, **kwargs) -> np.ndarray:
+def _empty_aggregate(*args: Any, **kwargs: Any) -> Any:
     """Return unchanged array."""
     return args[0]
 
@@ -185,7 +185,7 @@ def calculate_frc(
 
     single_image = image2 is None
     reverse = average and single_image
-    original_image1 = image1.copy() if reverse else None
+    original_image1: np.ndarray | None = image1.copy() if reverse else None
 
     if isinstance(spacing, (int, float)):
         spacing = [spacing] * image1.ndim
@@ -204,6 +204,7 @@ def calculate_frc(
     # Average with reverse pattern (only for single image mode)
     if reverse:
         # Use original unprocessed image for reverse split
+        assert original_image1 is not None
         image1, image2 = preprocess_images(
             original_image1,
             None,
@@ -389,7 +390,7 @@ def calculate_sectioned_fsc(
         image1.shape,
         bin_delta,
         angle_delta,
-        extract_angle_delta,
+        int(np.rad2deg(extract_angle_delta)),
     )
     fsc_task = DirectionalFSC(image1, image2, iterator)
     data = fsc_task.execute()
@@ -450,9 +451,9 @@ def grid_crop_resolution(
 ) -> dict[str, np.ndarray]:
     """Calculate FRC-based 3D image resolution by tiling and taking 2D slices along XY and XZ."""
     if not return_resolution or aggregate is None:
-        aggregate_fn = _empty_aggregate
+        aggregate_fn: Callable[..., Any] = _empty_aggregate
     else:
-        aggregate_fn = aggregate
+        aggregate_fn = cast(Callable[..., Any], aggregate)
 
     if isinstance(spacing, (int, float)):
         spacing = [spacing, spacing, spacing]
@@ -529,9 +530,9 @@ def five_crop_resolution(
 ) -> dict[str, np.ndarray]:
     """Calculate FRC-based 3D image resolution by taking 2D slices along XY and XZ at 4 corners and the center."""
     if not return_resolution or aggregate is None:
-        aggregate_fn = _empty_aggregate
+        aggregate_fn: Callable[..., Any] = _empty_aggregate
     else:
-        aggregate_fn = aggregate
+        aggregate_fn = cast(Callable[..., Any], aggregate)
 
     if isinstance(spacing, (int, float)):
         spacing = [spacing, spacing, spacing]
@@ -597,7 +598,7 @@ def frc_resolution_difference(
     image1: np.ndarray,
     image2: np.ndarray,
     *,
-    spacing: float | tuple[float, float] = 1.0,
+    spacing: float | tuple[float, float, float] = 1.0,
     downscale_xy: bool = False,
     axis: str = "xy",
     frc_bin_delta: int = 3,
@@ -605,25 +606,31 @@ def frc_resolution_difference(
 ) -> float:
     """Calculate difference between FRC-based resulutions of two images."""
     if isinstance(spacing, (int, float)):
-        spacing = (spacing, spacing, spacing)
-    if np.any(np.asarray(spacing) != 1.0):
+        spacing_tuple: tuple[float, float, float] = (
+            float(spacing),
+            float(spacing),
+            float(spacing),
+        )
+    else:
+        spacing_tuple = spacing
+    if np.any(np.asarray(spacing_tuple) != 1.0):
         image1 = rescale_isotropic(
-            image1, voxel_sizes=spacing, downscale_xy=downscale_xy
+            image1, voxel_sizes=spacing_tuple, downscale_xy=downscale_xy
         )
         image2 = rescale_isotropic(
-            image2, voxel_sizes=spacing, downscale_xy=downscale_xy
+            image2, voxel_sizes=spacing_tuple, downscale_xy=downscale_xy
         )
 
     image1_res = grid_crop_resolution(
         image1,
         bin_delta=frc_bin_delta,
-        spacing=spacing,
+        spacing=spacing_tuple,
         aggregate=aggregate,
     )
     image2_res = grid_crop_resolution(
         image2,
         bin_delta=frc_bin_delta,
-        spacing=spacing,
+        spacing=spacing_tuple,
         aggregate=aggregate,
     )
     return (
