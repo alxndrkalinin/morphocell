@@ -595,35 +595,13 @@ def frc_resolution_difference(
     image1: np.ndarray,
     image2: np.ndarray,
     *,
+    bin_delta: int = 3,
     spacing: float | tuple[float, float] = 1.0,
-    downscale_xy: bool = False,
-    axis: str = "xy",
-    frc_bin_delta: int = 3,
-    aggregate: Callable = np.mean,
 ) -> float:
     """Calculate difference between FRC-based resulutions of two images."""
     if isinstance(spacing, (int, float)):
-        spacing = (spacing, spacing, spacing)
-    if np.any(np.asarray(spacing) != 1.0):
-        image1 = rescale_isotropic(
-            image1, voxel_sizes=spacing, downscale_xy=downscale_xy
-        )
-        image2 = rescale_isotropic(
-            image2, voxel_sizes=spacing, downscale_xy=downscale_xy
-        )
+        spacing = (spacing, spacing)
 
-    image1_res = grid_crop_resolution(
-        image1,
-        bin_delta=frc_bin_delta,
-        spacing=spacing,
-        aggregate=aggregate,
-    )
-    image2_res = grid_crop_resolution(
-        image2,
-        bin_delta=frc_bin_delta,
-        spacing=spacing,
-        aggregate=aggregate,
-    )
-    return (
-        aggregate(image2_res[axis]) - aggregate(image1_res[axis])
-    ) * 1000  # return diff in nm
+    image1_res = frc_resolution(image1, bin_delta=bin_delta, spacing=spacing)
+    image2_res = frc_resolution(image2, bin_delta=bin_delta, spacing=spacing)
+    return (image2_res - image1_res) * 1000  # return diff in nm

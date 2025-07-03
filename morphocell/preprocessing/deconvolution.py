@@ -6,14 +6,21 @@ import numpy as np
 import numpy.typing as npt
 from typing import Union, Tuple, Optional, Callable, List, Dict, Any
 from pathlib import Path
+from functools import partial
 
 from skimage import io
-from skimage._shared.utils import _supported_float_type
-from morphocell.skimage import restoration  # noqa: F401
+from morphocell.skimage import restoration, util  # noqa: F401
 import math
 
-from ..image_utils import pad_image
-from ..cuda import RunAsCUDASubprocess, get_array_module
+from morphocell.image_utils import pad_image
+from morphocell.cuda import (
+    RunAsCUDASubprocess,
+    get_array_module,
+    asnumpy,
+    ascupy,
+    to_same_device,
+    check_same_device,
+)
 
 try:
     from flowdec import data as fd_data
@@ -168,7 +175,6 @@ def richardson_lucy_flowdec(
     else:
         psf = np.asarray(psf)
 
-    # assert image.shape == psf.shape
     verboseprint(
         f"Deconvolving image shape {image.shape} with psf shape {psf.shape} for {n_iter} iterations."
     )  # type: ignore[operator]
@@ -186,8 +192,8 @@ def richardson_lucy_flowdec(
 
 
 def decon_flowdec(
-    image: Union[str, npt.ArrayLike],
-    psf: Union[str, npt.ArrayLike],
+    image: np.ndarray,
+    psf: np.ndarray,
     n_iter: int = 1,
     pad_psf: bool = False,
     pad_size_z: int = 1,
@@ -200,22 +206,23 @@ def decon_flowdec(
     """Perform FlowDec deconvolution with image padding and rescaling."""
     check_tf_available()
 
-    if isinstance(image, str):
-        image = io.imread(str(image))
-    if isinstance(psf, str):
-        psf = io.imread(str(psf))
-
-    # assert image.shape == psf.shape
     padded_img = pad_image(image, pad_size_z, mode="reflect")
     padded_psf = pad_image(psf, pad_size_z, mode="reflect") if pad_psf else psf
-    # assert padded_img.shape == padded_psf.shape
+
+    # Create wrapper observer that handles postprocessing
+    wrapper_observer = None
+    if observer_fn is not None:
+        def wrapper_observer(restored_image, i, *args):
+            # Apply same postprocessing as final result
+            processed_image = restored_image[pad_size_z : image.shape[0] + pad_size_z, :, :].astype(np.uint16)
+            observer_fn(processed_image, i, *args)
 
     fl_decon_image = richardson_lucy_flowdec(
         padded_img,
         padded_psf,
         n_iter=n_iter,
         start_mode=start_mode,
-        observer_fn=observer_fn,
+        observer_fn=wrapper_observer,
         device=device,
         verbose=verbose,
         subprocess_cuda=subprocess_cuda,
@@ -235,58 +242,60 @@ def richardson_lucy_skimage(
     filter_epsilon: Optional[float] = None,
 ) -> np.ndarray:
     """Lucy-Richardson deconvolution using :mod:`morphocell.skimage`."""
-    xp = get_array_module(image)
-    if xp is not get_array_module(psf):
-        raise ValueError("image and psf must reside on the same device")
 
-    float_type = _supported_float_type(image.dtype)
-    image = xp.asarray(image, dtype=float_type)
-    psf = xp.asarray(psf, dtype=float_type)
-
-    estimate = restoration.richardson_lucy(
-        image,
-        psf,
-        num_iter=n_iter,
+    rl_partial = partial(
+        restoration.richardson_lucy,
+        psf=psf,
         clip=clip,
         filter_epsilon=filter_epsilon,
     )
 
-    if observer_fn is not None:
-        observer_fn(estimate, n_iter)
-
+    if observer_fn is None:
+        return rl_partial(image, num_iter=n_iter)
+    
+    estimate = image.copy()
+    for i in range(1, n_iter + 1):
+        estimate = rl_partial(estimate, num_iter=1)
+        observer_fn(estimate, i)
+    
     return estimate
 
 
 def decon_skimage(
-    image: Union[str, npt.ArrayLike],
-    psf: Union[str, npt.ArrayLike],
+    image: np.ndarray,
+    psf: np.ndarray,
     n_iter: int = 1,
     pad_psf: bool = False,
-    pad_size_z: int = 1,
+    pad_size_z: int = 0,
     observer_fn: Optional[Callable] = None,
     clip: bool = True,
     filter_epsilon: Optional[float] = None,
 ) -> np.ndarray:
     """Perform scikit-image deconvolution with image padding."""
-    if isinstance(image, str):
-        image = io.imread(str(image))
-    if isinstance(psf, str):
-        psf = io.imread(str(psf))
+    check_same_device(image, psf)
 
     padded_img = pad_image(image, pad_size_z, mode="reflect")
     padded_psf = pad_image(psf, pad_size_z, mode="reflect") if pad_psf else psf
+
+    # Create wrapper observer that handles postprocessing
+    wrapper_observer = None
+    if observer_fn is not None:
+        def wrapper_observer(restored_image, i, *args):
+            # Apply same postprocessing as final result
+            processed_image = restored_image[pad_size_z : image.shape[0] + pad_size_z, :, :]
+            observer_fn(processed_image, i, *args)
 
     decon_image = richardson_lucy_skimage(
         padded_img,
         padded_psf,
         n_iter=n_iter,
-        observer_fn=observer_fn,
+        observer_fn=wrapper_observer,
         clip=clip,
         filter_epsilon=filter_epsilon,
     )
 
     decon_image = decon_image[pad_size_z : image.shape[0] + pad_size_z, :, :]
-    return decon_image.astype(np.uint16)
+    return decon_image
 
 
 def _pad_nd(
@@ -313,7 +322,7 @@ def _unpad_nd(padded: npt.ArrayLike, img_size: Tuple[int, ...], xp: Any) -> np.n
     return padded[slices]
 
 
-def richardson_lucy_np(
+def richardson_lucy_xp(
     image: npt.ArrayLike,
     psf: npt.ArrayLike,
     n_iter: int = 10,
@@ -324,48 +333,59 @@ def richardson_lucy_np(
 ) -> np.ndarray:
     """Lucy-Richardson deconvolution implemented with NumPy or CuPy."""
     xp = get_array_module(image)
-    if xp is not get_array_module(psf):
-        raise ValueError("image and psf must reside on the same device")
 
-    float_type = _supported_float_type(image.dtype)
-    image = xp.asarray(image, dtype=float_type)
-    psf = xp.asarray(psf, dtype=float_type)
+    image = util.img_as_float(image)
+    psf = util.img_as_float(psf)
 
     if not noncirc and image.shape != psf.shape:
         psf, _ = _pad_nd(psf, image.shape, "constant", xp)
 
-    htones = xp.ones_like(image)
+    mask_values = None
     if mask is not None:
-        htones = htones * mask
+        mask = util.img_as_float(mask)
         mask_values = image * (1 - mask)
-        image = image * mask
+        image *= mask 
 
     if noncirc:
         orig_size = image.shape
         ext_size = [
-            image.shape[i] + 2 * int(psf.shape[i] / 2) for i in range(image.ndim)
+            image.shape[i] + psf.shape[i] - 1 for i in range(image.ndim)
         ]
-        image, _ = _pad_nd(image, ext_size, "constant", xp)
-        htones, _ = _pad_nd(htones, ext_size, "constant", xp)
         psf, _ = _pad_nd(psf, ext_size, "constant", xp)
 
-    otf = xp.fft.fftn(xp.fft.ifftshift(psf))
-    otf_conj = xp.conjugate(otf)
+    psf = xp.fft.fftn(xp.fft.ifftshift(psf))
+    otf_conj = xp.conjugate(psf)
 
-    estimate = xp.full_like(image, xp.mean(image) if noncirc else 1)
-    if not noncirc:
-        estimate = image.copy()
+    if noncirc:
+        image, _ = _pad_nd(image, ext_size, "constant", xp)
+        estimate = xp.full_like(image, xp.mean(image))
+    else:
+        estimate = image
 
+    if mask is not None:
+        htones = xp.ones_like(image) * mask
+    else:
+        htones = xp.ones_like(image)
+    
     htones = xp.real(xp.fft.ifftn(xp.fft.fftn(htones) * otf_conj))
     htones[htones < 1e-6] = 1
 
     for i in range(1, n_iter + 1):
-        reblurred = xp.real(xp.fft.ifftn(xp.fft.fftn(estimate) * otf))
-        ratio = image / (reblurred + 1e-12)
+        reblurred = xp.real(xp.fft.ifftn(xp.fft.fftn(estimate) * psf))
+        ratio = image / (reblurred + 1e-6)
         correction = xp.real(xp.fft.ifftn(xp.fft.fftn(ratio) * otf_conj))
-        estimate *= correction / htones
+        
+        correction[correction < 0] = 0
+        estimate = estimate * correction / htones
+        
         if observer_fn is not None:
-            observer_fn(estimate, i)
+            if noncirc:
+                unpadded_estimate = _unpad_nd(estimate, orig_size, xp)
+                observer_fn(unpadded_estimate, i)
+            else:
+                observer_fn(estimate, i)
+
+    del psf, otf_conj, htones
 
     if noncirc:
         estimate = _unpad_nd(estimate, orig_size, xp)
@@ -376,37 +396,42 @@ def richardson_lucy_np(
     return estimate
 
 
-def decon_numpy(
-    image: Union[str, npt.ArrayLike],
-    psf: Union[str, npt.ArrayLike],
+def decon_xpy(
+    image: np.ndarray,
+    psf: np.ndarray,
     n_iter: int = 1,
     pad_psf: bool = False,
-    pad_size_z: int = 1,
+    pad_size_z: int = 0,
     *,
     noncirc: bool = False,
     mask: Optional[npt.ArrayLike] = None,
     observer_fn: Optional[Callable] = None,
 ) -> np.ndarray:
     """Perform NumPy-based deconvolution with optional non-circulant edges."""
-    if isinstance(image, str):
-        image = io.imread(str(image))
-    if isinstance(psf, str):
-        psf = io.imread(str(psf))
+    check_same_device(image, psf)
 
     padded_img = pad_image(image, pad_size_z, mode="reflect")
     padded_psf = pad_image(psf, pad_size_z, mode="reflect") if pad_psf else psf
 
-    decon_image = richardson_lucy_np(
+    # Create wrapper observer that handles postprocessing
+    wrapper_observer = None
+    if observer_fn is not None:
+        def wrapper_observer(restored_image, i, *args):
+            # Apply same postprocessing as final result
+            processed_image = restored_image[pad_size_z : image.shape[0] + pad_size_z, :, :]
+            observer_fn(processed_image, i, *args)
+
+    decon_image = richardson_lucy_xp(
         padded_img,
         padded_psf,
         n_iter=n_iter,
         noncirc=noncirc,
         mask=mask,
-        observer_fn=observer_fn,
+        observer_fn=wrapper_observer,
     )
 
     decon_image = decon_image[pad_size_z : image.shape[0] + pad_size_z, :, :]
-    return decon_image.astype(np.uint16)
+    return decon_image
 
 
 def deconv_iter_num_finder(
@@ -421,6 +446,7 @@ def deconv_iter_num_finder(
     subprocess_cuda: bool = False,
     implementation: str = "flowdec",
     noncirc: bool = False,
+    use_gpu: bool = False,
 ) -> Tuple[int, List[Dict[str, Union[int, float, np.ndarray]]]]:
     """Find number of LR deconvolution iterations using an image similarity metric.
 
@@ -432,23 +458,25 @@ def deconv_iter_num_finder(
     noncirc : bool, optional
         When ``implementation='numpy'``, enable non-circulant edge handling.
     """
-    if implementation == "flowdec":
-        check_tf_available()
     verboseprint = print if verbose else lambda *a, **k: None
 
     if isinstance(image, (str, Path)):
         image = io.imread(str(image))
-    else:
-        image = np.asarray(image)
     if isinstance(psf, (str, Path)):
         psf = io.imread(str(psf))
-    else:
-        psf = np.asarray(psf)
+
+    if use_gpu:
+        image = ascupy(image)
+        psf = ascupy(psf)
+
+    image = util.img_as_float(image)
+    psf = util.img_as_float(psf)
+
     if metric_kwargs is None:
         metric_kwargs = {}
 
     thresh_iter = 0
-    results = [{"metric_gain": metric_threshold, "iter_image": image}]
+    results = [{"metric_gain": metric_threshold, "iter_image": asnumpy(image)}]
 
     def get_decon_observer(metric_fn, metric_kwargs):
         nonlocal thresh_iter
@@ -456,46 +484,45 @@ def deconv_iter_num_finder(
         def decon_observer(restored_image, i, *args):
             nonlocal thresh_iter
 
-            # stop metric calculations after reaching threshold to save time
-            if thresh_iter == 0:  # threshold not reached
-                prev_image = results[i - 1]["iter_image"]
-                curr_image = restored_image[
-                    pad_size_z : prev_image.shape[0] + pad_size_z, :, :
-                ].astype(np.uint16)
-                metric_result = metric_fn(prev_image, curr_image, **metric_kwargs)
+            if thresh_iter > 0:
+                return
 
-                metric_gain = (
-                    metric_result[0]
-                    if isinstance(metric_result, tuple)
-                    else metric_result
+            # No postprocessing needed - deconvolution functions handle it
+            curr_image = restored_image
+            
+            prev_iter_image = to_same_device(results[-1]["iter_image"], curr_image)
+            metric_result = metric_fn(prev_iter_image, curr_image, **metric_kwargs)
+            
+            metric_gain = (
+                metric_result[0]
+                if isinstance(metric_result, tuple)
+                else metric_result
+            )
+            
+            results.append(
+                {
+                    "metric_gain": float(metric_gain),
+                    "iter_image": asnumpy(curr_image),
+                    "metric_result": metric_result,
+                }
+            )
+            verboseprint(f"Iteration {i}: improvement {metric_gain:.8f}")
+
+            if (i > 1) and (metric_gain > metric_threshold):
+                thresh_iter = i
+                metric_gain_total = metric_fn(
+                    to_same_device(results[0]["iter_image"], curr_image),
+                    curr_image,
+                    **metric_kwargs,
                 )
-                results.append(
-                    {
-                        "metric_gain": metric_gain,
-                        "iter_image": curr_image,
-                        "metric_result": metric_result,
-                    }
+                if isinstance(metric_gain_total, tuple):
+                    metric_gain_total = metric_gain_total[0]
+
+                verboseprint(
+                    f"\nThreshold {metric_threshold} reached at iteration {i}"
+                    f" with improvement: {metric_gain:.8f}.\n"
+                    f"Metric between original and restored images: {metric_gain_total:.8f}.\n"
                 )
-                verboseprint(f"Iteration {i}: improvement {metric_gain:.8f}")
-
-                if (i > 1) and (metric_gain > metric_threshold):  # threshold reached
-                    thresh_iter = i
-                    metric_gain_total = metric_fn(
-                        results[0]["iter_image"],
-                        results[-1]["iter_image"],
-                        **metric_kwargs,
-                    )
-                    metric_gain_total = (
-                        metric_gain_total[0]
-                        if isinstance(metric_gain_total, tuple)
-                        else metric_gain_total
-                    )
-
-                    verboseprint(
-                        f"\nThreshold {metric_threshold} reached at iteration {i}"
-                        f" with improvement: {metric_gain:.8f}.\n"
-                        f"Metric between original and restored images: {metric_gain_total:.8f}.\n"
-                    )
 
         return decon_observer
 
@@ -508,6 +535,7 @@ def deconv_iter_num_finder(
             observer_fn=observer,
             verbose=verbose,
             subprocess_cuda=subprocess_cuda,
+            pad_size_z=pad_size_z,
         )
     elif implementation == "skimage":
         _ = decon_skimage(
@@ -515,16 +543,21 @@ def deconv_iter_num_finder(
             psf,
             n_iter=max_iter,
             observer_fn=observer,
+            pad_size_z=pad_size_z,
         )
-    elif implementation == "numpy":
-        _ = decon_numpy(
+    elif implementation == "xpy":
+        _ = decon_xpy(
             image,
             psf,
             n_iter=max_iter,
             noncirc=noncirc,
             observer_fn=observer,
+            pad_size_z=pad_size_z,
         )
     else:
         raise ValueError(f"Unknown implementation: {implementation}")
 
+    for i, result in enumerate(results):
+            results[i]["iter_image"] = asnumpy(result["iter_image"])
+    
     return (thresh_iter, results)
