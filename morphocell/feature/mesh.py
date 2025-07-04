@@ -1,17 +1,47 @@
-"""Extract features from a label image using trimesh."""
+"""Extract features from a label image using ``trimesh``."""
+
+from __future__ import annotations
 
 import warnings
-from typing import Any
+from typing import Any, TypeVar, Callable
+from functools import wraps
 
 import numpy as np
-import trimesh
 from skimage.measure import marching_cubes
-from trimesh.curvature import (
-    discrete_mean_curvature_measure,
-    discrete_gaussian_curvature_measure,
-)
+
+try:  # pragma: no cover - optional dependency
+    import trimesh
+    from trimesh.curvature import (
+        discrete_mean_curvature_measure,
+        discrete_gaussian_curvature_measure,
+    )
+
+    _TRIMESH_AVAILABLE = True
+except Exception:  # pragma: no cover - import failure path
+    trimesh = None
+    _TRIMESH_AVAILABLE = False
+    warnings.warn(
+        "trimesh is not installed. Mesh features are unavailable.",
+        stacklevel=2,
+    )
 
 from ..cuda import asnumpy
+
+F = TypeVar("F", bound=Callable[..., Any])
+
+
+def _require_trimesh(func: F) -> F:
+    """Ensure ``trimesh`` is available before calling ``func``."""
+
+    @wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        if not _TRIMESH_AVAILABLE:
+            raise RuntimeError(
+                "trimesh is required for mesh operations. Install with 'morphocell[mesh]'"
+            )
+        return func(*args, **kwargs)
+
+    return wrapper  # type: ignore[return-value]
 
 
 def mesh_feature_list() -> list[str]:
@@ -40,10 +70,11 @@ def mesh_feature_list() -> list[str]:
     ]
 
 
+@_require_trimesh
 def extract_features(
     label_image: np.ndarray, features: list[str] | None = None
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Extract features from a label image using trimesh."""
+    """Extract features from a label image using ``trimesh``."""
     label_image = asnumpy(label_image)
     labels = np.unique(label_image)
 
@@ -57,12 +88,14 @@ def extract_features(
     return labels, np.asarray(feature_values)
 
 
+@_require_trimesh
 def extract_surface_features(mask: np.ndarray) -> dict[str, float]:
     """Generate mesh from a single label mask and extract its surface features."""
     mesh = mask2mesh(mask)
     return extract_mesh_features(mesh)
 
 
+@_require_trimesh
 def mask2mesh(
     mask_3d: np.ndarray, marching_cubes_kwargs: dict[str, Any] | None = None
 ) -> trimesh.Trimesh:
@@ -79,8 +112,9 @@ def ellipsoid_sphericity(v: float, sa: float) -> float:
     return np.power(np.pi, 1 / 3) * np.power(6 * v, 2 / 3) / sa
 
 
+@_require_trimesh
 def extract_mesh_features(mesh: trimesh.Trimesh) -> dict[str, float]:
-    """Extract surface features from a trimesh object."""
+    """Extract surface features from a ``trimesh`` object."""
     axis_len = sorted(mesh.extents)
     intertia_pcs = mesh.principal_inertia_components
     volume = mesh.volume
