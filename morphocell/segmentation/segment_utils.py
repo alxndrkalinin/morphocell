@@ -2,8 +2,7 @@
 
 import warnings
 
-from typing import Optional, Sequence
-import numpy.typing as npt
+from typing import Any, Optional, Sequence
 
 import numpy as np
 from skimage.segmentation import watershed
@@ -16,13 +15,13 @@ from ..skimage import transform, filters, morphology, feature
 
 
 def downscale_and_filter(
-    image: npt.ArrayLike,
+    image: np.ndarray,
     downscale_factor: float = 0.5,
     downscale_order: int = 3,
     downscale_anti_aliasing: bool = True,
     filter_size: int = 3,
     filter_shape: str = "square",
-) -> npt.ArrayLike:
+) -> np.ndarray:
     """Subsample and filter image prior to segmentiation.
 
     Parameters
@@ -92,12 +91,12 @@ def check_labeled_binary(image):
 
 
 def cleanup_segmentation(
-    label_img: npt.ArrayLike,
+    label_img: np.ndarray,
     min_obj_size: Optional[int] = None,
     max_obj_size: Optional[int] = None,
     border_buffer_size: Optional[int] = None,
     max_hole_size: Optional[int] = None,
-) -> npt.ArrayLike:
+) -> np.ndarray:
     """Clean up segmented image by removing small objects, clearing borders, and closing holes."""
     check_labeled_binary(label_img)
 
@@ -121,7 +120,7 @@ def cleanup_segmentation(
             )
             label_img[filled_mask] = label_id
 
-    return label(label_img).astype(np.uint8)
+    return np.asarray(label(label_img)).astype(np.uint8)
 
 
 def find_objects(label_image, max_label=None):
@@ -174,9 +173,7 @@ def find_objects(label_image, max_label=None):
     return object_slices
 
 
-def remove_large_objects(
-    label_image: npt.ArrayLike, max_size: int = 100000
-) -> npt.ArrayLike:
+def remove_large_objects(label_image: np.ndarray, max_size: int = 100000) -> np.ndarray:
     """Remove objects with volume above specified threshold."""
     check_labeled_binary(label_image)
     label_volumes = np.bincount(label_image.ravel())
@@ -186,16 +183,14 @@ def remove_large_objects(
     return label_image
 
 
-def remove_small_objects(
-    label_image: npt.ArrayLike, min_size: int = 500
-) -> npt.ArrayLike:
+def remove_small_objects(label_image: np.ndarray, min_size: int = 500) -> np.ndarray:
     """Remove objects with volume below specified threshold."""
     check_labeled_binary(label_image)
     label_image = morphology.remove_small_objects(label_image, min_size=min_size)
     return label_image
 
 
-def clear_xy_borders(label_image: npt.ArrayLike, buffer_size: int = 0) -> npt.ArrayLike:
+def clear_xy_borders(label_image: np.ndarray, buffer_size: int = 0) -> np.ndarray:
     """Remove masks that touch XY borders."""
     check_labeled_binary(label_image)
     if label_image.ndim == 2:
@@ -204,12 +199,12 @@ def clear_xy_borders(label_image: npt.ArrayLike, buffer_size: int = 0) -> npt.Ar
         label_image, (buffer_size + 1, buffer_size + 1), mode="constant"
     )
     label_image = clear_border(label_image, buffer_size=buffer_size)
-    return label(label_image[buffer_size + 1 : -(buffer_size + 1), :, :])
+    return np.asarray(label(label_image[buffer_size + 1 : -(buffer_size + 1), :, :]))
 
 
 def remove_touching_objects(
-    label_image: npt.ArrayLike, border_value: int = 100
-) -> npt.ArrayLike:
+    label_image: np.ndarray, border_value: int = 100
+) -> np.ndarray:
     """Find labelled masks that overlap and remove from the image."""
     check_labeled_binary(label_image)
 
@@ -235,7 +230,7 @@ def remove_touching_objects(
     return label_image
 
 
-def remove_thin_objects(label_image, min_z=2):
+def remove_thin_objects(label_image: np.ndarray, min_z: int = 2) -> np.ndarray:
     """Remove objects thinner than a specified minimum value in Z."""
     unique_labels = [
         regionlabel for regionlabel in np.unique(label_image) if regionlabel != 0
@@ -254,30 +249,40 @@ def remove_thin_objects(label_image, min_z=2):
     return label_image
 
 
-def segment_watershed(image, markers=None, ball_size=15):
+def segment_watershed(
+    image: np.ndarray,
+    markers: Optional[np.ndarray] = None,
+    ball_size: int = 15,
+) -> np.ndarray:
     """Segment image using watershed algorithm."""
     device = get_device(image)
 
-    distance = distance_transform_edt(image)
-    coords = feature.peak_local_max(
-        distance, footprint=morphology.ball(ball_size), labels=image
+    distance = np.asarray(distance_transform_edt(image))
+    coords = np.asarray(
+        feature.peak_local_max(
+            distance, footprint=morphology.ball(ball_size), labels=image
+        )
     )
 
     # https://github.com/rapidsai/cucim/issues/89
     if markers is None:
         mask = np.zeros(distance.shape, dtype=bool)
         mask[tuple(asnumpy(coords.T))] = True
-        markers = label(mask)
-        labels = watershed(-asnumpy(distance), markers, mask=asnumpy(image))
+        markers = np.asarray(label(mask))
+        labels = watershed(
+            -np.asarray(asnumpy(distance)), markers, mask=np.asarray(asnumpy(image))
+        )
     else:
         labels = watershed(
-            asnumpy(image), markers=asnumpy(markers), mask=asnumpy(image)
+            np.asarray(asnumpy(image)),
+            markers=np.asarray(asnumpy(markers)),
+            mask=np.asarray(asnumpy(image)),
         )
     # return on the same device as input
     return to_device(labels, device)
 
 
-def _binary_fill_holes(image):
+def _binary_fill_holes(image: np.ndarray) -> np.ndarray:
     """Fill holes in binary objects."""
     if get_device(image) == "GPU":
         from cupyx.scipy.ndimage import binary_fill_holes
@@ -289,7 +294,9 @@ def _binary_fill_holes(image):
     return binary_fill_holes(image)
 
 
-def fill_label_holes(lbl_img, **binary_fill_holes_kwargs):
+def fill_label_holes(
+    lbl_img: np.ndarray, **binary_fill_holes_kwargs: Any
+) -> np.ndarray:
     """
     Fill small holes in label image.
 
@@ -322,11 +329,11 @@ def fill_label_holes(lbl_img, **binary_fill_holes_kwargs):
 
 
 def fill_holes_slicer(
-    image: npt.ArrayLike,
+    image: np.ndarray,
     area_threshold: int = 1000,
     num_iterations: int = 1,
     axes: Optional[Sequence[int]] = None,
-):
+) -> np.ndarray:
     """
     Fill holes in slices of binary or labeled objects.
 
