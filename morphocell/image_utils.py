@@ -1,6 +1,7 @@
 """Implements utility functions that operate on 3D images."""
 
-from typing import Sequence, Optional, Any, Callable
+from collections.abc import Sequence, Callable
+from typing import Any
 import numpy.typing as npt
 
 import numpy as np
@@ -50,8 +51,8 @@ def rescale_isotropic(
     downscale_xy: bool = False,
     order: int = 3,
     preserve_range: bool = True,
-    target_z_size: Optional[int] = None,
-    target_z_voxel_size: Optional[float] = None,
+    target_z_size: int | None = None,
+    target_z_voxel_size: float | None = None,
 ) -> np.ndarray:
     """Rescale image to isotropic voxels with arbitary Z (voxel) size."""
     if target_z_voxel_size is not None:
@@ -99,7 +100,7 @@ def pad_image(
     pad_size: int | Sequence[int],
     axes: int | Sequence[int] = 0,
     mode: str = "reflect",
-    deps: Optional[dict] = None,
+    deps: dict | None = None,
 ) -> np.ndarray:
     """Pad an image."""
     npad = np.asarray([(0, 0)] * img.ndim)
@@ -111,9 +112,9 @@ def pad_image(
 
 def pad_image_to_cube(
     img: np.ndarray,
-    cube_size: Optional[int] = None,
+    cube_size: int | None = None,
     mode: str = "reflect",
-    axes: Optional[Sequence[int]] = None,
+    axes: Sequence[int] | None = None,
 ) -> np.ndarray:
     """Pad all image axes up to cubic shape."""
     axes = list(range(img.ndim)) if axes is None else axes
@@ -162,7 +163,7 @@ def pad_to_matching_shape(
 def crop_tl(
     img: np.ndarray,
     crop_size: int | Sequence[int],
-    axes: Optional[Sequence[int]] = None,
+    axes: Sequence[int] | None = None,
 ) -> np.ndarray:
     """Crop from the top-left corner."""
     return crop_corner(img, crop_size, axes, "tl")
@@ -171,7 +172,7 @@ def crop_tl(
 def crop_bl(
     img: np.ndarray,
     crop_size: int | Sequence[int],
-    axes: Optional[Sequence[int]] = None,
+    axes: Sequence[int] | None = None,
 ) -> np.ndarray:
     """Crop from the bottom-left corner."""
     return crop_corner(img, crop_size, axes, "bl")
@@ -180,7 +181,7 @@ def crop_bl(
 def crop_tr(
     img: np.ndarray,
     crop_size: int | Sequence[int],
-    axes: Optional[Sequence[int]] = None,
+    axes: Sequence[int] | None = None,
 ) -> np.ndarray:
     """Crop from the top-right corner."""
     return crop_corner(img, crop_size, axes, "tr")
@@ -189,7 +190,7 @@ def crop_tr(
 def crop_br(
     img: np.ndarray,
     crop_size: int | Sequence[int],
-    axes: Optional[Sequence[int]] = None,
+    axes: Sequence[int] | None = None,
 ) -> np.ndarray:
     """Crop from the bottom-right corner."""
     return crop_corner(img, crop_size, axes, "br")
@@ -198,7 +199,7 @@ def crop_br(
 def crop_corner(
     img: np.ndarray,
     crop_size: int | Sequence[int],
-    axes: Optional[Sequence[int]] = None,
+    axes: Sequence[int] | None = None,
     corner: str = "tl",
 ) -> np.ndarray:
     """Crop a corner from the image."""
@@ -233,8 +234,8 @@ def crop_corner(
 
 def crop_center(
     img: np.ndarray,
-    crop_size: Optional[int | Sequence[int]],
-    axes: Optional[Sequence[int]] = None,
+    crop_size: int | Sequence[int] | None,
+    axes: Sequence[int] | None = None,
 ) -> np.ndarray:
     """Crop from the center of the n-dimensional image."""
     axes = list(range(img.ndim)) if axes is None else axes
@@ -299,7 +300,7 @@ def random_crop(
 def crop_to_divisor(
     img: np.ndarray,
     divisors: int | Sequence[int],
-    axes: Optional[Sequence[int]] = None,
+    axes: Sequence[int] | None = None,
     crop_type: str = "center",
 ) -> np.ndarray:
     """Crop image to be divisible by the given divisors along specified axes."""
@@ -514,12 +515,12 @@ def select_max_contrast_slices(
 
 def distance_transform_edt(
     img: npt.ArrayLike,
-    sampling: Optional[Sequence[float]] = None,
+    sampling: Sequence[float] | None = None,
     return_distances: bool = True,
     return_indices: bool = False,
-    distances: Optional[npt.ArrayLike] = None,
-    indices: Optional[npt.ArrayLike] = None,
-    block_params: Optional[tuple[int, int, int]] = None,
+    distances: npt.ArrayLike | None = None,
+    indices: npt.ArrayLike | None = None,
+    block_params: tuple[int, int, int] | None = None,
     float64_distances: bool = False,
 ) -> npt.ArrayLike | tuple[npt.ArrayLike, npt.ArrayLike]:
     """Compute the Euclidean distance transform of a binary image."""

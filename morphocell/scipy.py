@@ -3,7 +3,8 @@
 from functools import wraps
 from importlib import import_module
 from types import ModuleType
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 import warnings
 
 from .cuda import CUDAManager, asnumpy, to_device

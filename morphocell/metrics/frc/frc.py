@@ -1,6 +1,6 @@
 """Implements 2D/3D Fourier Ring/Shell Correlation."""
 
-from typing import Sequence, Callable
+from collections.abc import Sequence, Callable
 
 import numpy as np
 
@@ -13,7 +13,6 @@ from morphocell.image_utils import (
     crop_center,
     pad_image,
     get_xy_block_coords,
-    rescale_isotropic,
     pad_image_to_cube,
     hamming_window,
     checkerboard_split,

@@ -1,7 +1,7 @@
 """Extract features from a label image using trimesh."""
 
 import warnings
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 import trimesh
@@ -41,7 +41,7 @@ def mesh_feature_list() -> list[str]:
 
 
 def extract_features(
-    label_image: np.ndarray, features: Optional[list[str]] = None
+    label_image: np.ndarray, features: list[str] | None = None
 ) -> tuple[np.ndarray, np.ndarray]:
     """Extract features from a label image using trimesh."""
     label_image = asnumpy(label_image)
@@ -64,7 +64,7 @@ def extract_surface_features(mask: np.ndarray) -> dict[str, float]:
 
 
 def mask2mesh(
-    mask_3d: np.ndarray, marching_cubes_kwargs: Optional[dict[str, Any]] = None
+    mask_3d: np.ndarray, marching_cubes_kwargs: dict[str, Any] | None = None
 ) -> trimesh.Trimesh:
     """Convert 3D mask to a mesh using marching cubes."""
     marching_cubes_kwargs = marching_cubes_kwargs or {}

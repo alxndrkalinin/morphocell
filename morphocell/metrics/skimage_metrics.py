@@ -1,7 +1,8 @@
 """Implements GPU-compatible metrics from scikit-image."""
 
 from functools import wraps
-from typing import Callable, Any
+from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 
