@@ -1,21 +1,21 @@
 """Tests for the skimage proxy module."""
 
 import numpy as np
+import pytest
 
 import morphocell.skimage as mc_skimage
 from morphocell.cuda import CUDAManager, ascupy, asnumpy
 
 
-def _gpu_available() -> bool:
-    return CUDAManager().get_num_gpus() > 0
-
-
-def test_filters_gaussian_cpu_vs_gpu() -> None:
+@pytest.mark.parametrize("use_gpu", [False, True])
+def test_filters_gaussian_cpu_vs_gpu(use_gpu: bool, gpu_available: bool) -> None:
     """Compare Gaussian filtering on CPU and GPU."""
     img = np.random.random((5, 5)).astype(np.float32)
     cpu_res = mc_skimage.filters.gaussian(img, sigma=1.0, preserve_range=True)
 
-    if _gpu_available():
+    if use_gpu:
+        if not gpu_available:
+            pytest.skip("GPU not available")
         cp = CUDAManager().get_cp()
         gpu_res = mc_skimage.filters.gaussian(
             cp.asarray(img), sigma=1.0, preserve_range=True

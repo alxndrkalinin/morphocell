@@ -4,7 +4,6 @@ import numpy as np
 import pytest
 
 from morphocell.cuda import (
-    CUDAManager,
     ascupy,
     asnumpy,
     to_device,
@@ -12,33 +11,31 @@ from morphocell.cuda import (
 )
 
 
-def _gpu_available() -> bool:
-    return CUDAManager().get_num_gpus() > 0
+@pytest.mark.parametrize("device", ["CPU", "GPU"])
+def test_to_device_roundtrip(device: str, gpu_available: bool) -> None:
+    """Move array to the specified device and verify roundtrip."""
+    if device == "GPU" and not gpu_available:
+        pytest.skip("GPU not available")
 
-
-def test_to_device_roundtrip() -> None:
-    """Move array to GPU and back if available."""
     arr = np.ones((2, 2), dtype=np.float32)
-    cpu_arr = to_device(arr, "CPU")
-    assert isinstance(cpu_arr, np.ndarray)
-
-    if _gpu_available():
-        gpu_arr = to_device(arr, "GPU")
-        assert np.allclose(asnumpy(gpu_arr), arr)
+    res = to_device(arr, device)
+    if device == "GPU":
+        assert np.allclose(asnumpy(res), arr)
     else:
-        gpu_arr = to_device(arr, "CPU")
-        assert np.allclose(gpu_arr, arr)
+        assert np.allclose(res, arr)
+
 
 def test_to_device_invalid_device_raises() -> None:
-    """Test that to_device raises ValueError for invalid device string."""
+    """Ensure to_device raises ``ValueError`` for an invalid device string."""
     arr = np.ones((2, 2), dtype=np.float32)
     with pytest.raises(ValueError):
         to_device(arr, "INVALID_DEVICE")
 
-def test_check_same_device() -> None:
-    """Ensure mismatched devices trigger an error."""
+
+def test_check_same_device(gpu_available: bool) -> None:
+    """Ensure mismatched devices trigger an error when GPU is present."""
     arr = np.ones((2, 2), dtype=np.float32)
-    if _gpu_available():
+    if gpu_available:
         gpu_arr = ascupy(arr)
         with pytest.raises(ValueError):
             check_same_device(arr, gpu_arr)
