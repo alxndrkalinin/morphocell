@@ -4,7 +4,8 @@ import subprocess
 import warnings
 import numpy as np
 import numpy.typing as npt
-from typing import Union, Tuple, Optional, Callable, List, Dict, Any
+from collections.abc import Callable
+from typing import Any, Optional, Union
 from pathlib import Path
 
 from skimage import io
@@ -228,12 +229,12 @@ def deconv_iter_num_finder(
     psf: Union[str, Path, npt.ArrayLike],
     metric_fn: Callable,
     metric_threshold: Union[int, float],
-    metric_kwargs: Optional[Dict[str, Any]] = None,
+    metric_kwargs: Optional[dict[str, Any]] = None,
     max_iter: int = 25,
     pad_size_z: int = 1,
     verbose: bool = False,
     subprocess_cuda: bool = False,
-) -> Tuple[int, List[Dict[str, Union[int, float, np.ndarray]]]]:
+) -> tuple[int, list[dict[str, Union[int, float, np.ndarray]]]]:
     """Find number of LR deconvolution iterations using an image similarity metric."""
     check_tf_available()
     verboseprint = print if verbose else lambda *a, **k: None

@@ -1,7 +1,7 @@
 """Implement 3D image segmentation using Cellpose."""
 
 import warnings
-from typing import Optional, List, cast
+from typing import Optional, cast
 import numpy.typing as npt
 import numpy as np
 
@@ -25,7 +25,7 @@ def cellpose_eval(
     image: npt.ArrayLike,
     model_type: str = "cyto",
     omni: bool = False,
-    channels: Optional[List[int]] = None,
+    channels: Optional[list[int]] = None,
     diameter: Optional[int] = None,
     do_3D: bool = True,
 ) -> npt.ArrayLike:
@@ -45,7 +45,7 @@ def cellpose_segment(
     downscale_factor: float = 0.5,
     model_type: str = "cyto",
     omni: bool = False,
-    channels: Optional[List[int]] = None,
+    channels: Optional[list[int]] = None,
     diameter: Optional[int] = None,
     do_3D: bool = True,
     border_value: int = 100,

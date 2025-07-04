@@ -2,7 +2,8 @@
 
 import warnings
 
-from typing import Optional, Sequence
+from collections.abc import Sequence
+from typing import Optional
 
 import numpy as np
 from skimage.segmentation import watershed

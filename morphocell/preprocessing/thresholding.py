@@ -1,6 +1,6 @@
 """Implement 3D image thresholding."""
 
-from typing import List, Optional
+from typing import Optional
 import numpy.typing as npt
 
 import numpy as np
@@ -27,7 +27,7 @@ def select_nonempty_patches(
     min_nonzeros: float = 0.02,
     threshold: Optional[float] = None,
     verbose: bool = False,
-) -> List[List[int]]:
+) -> list[list[int]]:
     """Select XY patches from 3D image by percent of nonzero voxels."""
     verboseprint = print if verbose else lambda *a, **k: None
 

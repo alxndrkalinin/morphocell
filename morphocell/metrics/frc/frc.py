@@ -1,6 +1,7 @@
 """Implements 2D/3D Fourier Ring/Shell Correlation."""
 
-from typing import Sequence, Callable, Any, cast
+from collections.abc import Sequence, Callable
+from typing import Any, cast
 
 import numpy as np
 

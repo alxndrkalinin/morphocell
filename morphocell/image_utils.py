@@ -1,6 +1,7 @@
 """Implements utility functions that operate on 3D images."""
 
-from typing import Sequence, Optional, Any, Callable
+from collections.abc import Sequence, Callable
+from typing import Optional, Any
 import numpy.typing as npt
 
 import numpy as np

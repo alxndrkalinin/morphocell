@@ -2,7 +2,8 @@
 
 from functools import wraps
 from types import ModuleType
-from typing import Callable, Any
+from collections.abc import Callable
+from typing import Any
 from importlib import import_module
 
 from .cuda import CUDAManager
