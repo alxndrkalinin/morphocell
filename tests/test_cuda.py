@@ -29,6 +29,11 @@ def test_to_device_roundtrip() -> None:
         gpu_arr = to_device(arr, "CPU")
         assert np.allclose(gpu_arr, arr)
 
+def test_to_device_invalid_device_raises() -> None:
+    """Test that to_device raises ValueError for invalid device string."""
+    arr = np.ones((2, 2), dtype=np.float32)
+    with pytest.raises(ValueError):
+        to_device(arr, "INVALID_DEVICE")
 
 def test_check_same_device() -> None:
     """Ensure mismatched devices trigger an error."""
