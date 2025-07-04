@@ -12,9 +12,9 @@ CPU based approaches.
 
 ### Dependencies
 * Python >=3.10
-* Ubuntu 18.04
-* CUDA 11.2-12.1
-* Optional: Cellpose for segmentation
+* numpy/scipy/scikit-image
+* [optional] CUDA 11.2-12.1
+* [optional] Cellpose for segmentation
 
 ### Installation
 Clone the repository and install the base library:
@@ -28,8 +28,8 @@ pip install -e .
 Optional extras from `pyproject.toml` enable additional functionality:
 
 ```bash
-# resolution metrics
-pip install -e '.[frc]'
+# mesh feature extraction
+pip install -e '.[mesh]'
 # segmentation via Cellpose
 pip install -e '.[cellpose]'
 # developer tools (pre-commit, pytest)
