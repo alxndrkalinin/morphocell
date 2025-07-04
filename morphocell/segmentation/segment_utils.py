@@ -2,7 +2,7 @@
 
 import warnings
 
-from typing import Any, Optional, Sequence
+from typing import Optional, Sequence
 
 import numpy as np
 from skimage.segmentation import watershed
@@ -120,7 +120,7 @@ def cleanup_segmentation(
             )
             label_img[filled_mask] = label_id
 
-    return np.asarray(label(label_img)).astype(np.uint8)
+    return label(label_img).astype(np.uint8)
 
 
 def find_objects(label_image, max_label=None):
@@ -199,7 +199,7 @@ def clear_xy_borders(label_image: np.ndarray, buffer_size: int = 0) -> np.ndarra
         label_image, (buffer_size + 1, buffer_size + 1), mode="constant"
     )
     label_image = clear_border(label_image, buffer_size=buffer_size)
-    return np.asarray(label(label_image[buffer_size + 1 : -(buffer_size + 1), :, :]))
+    return label(label_image[buffer_size + 1 : -(buffer_size + 1), :, :])
 
 
 def remove_touching_objects(
@@ -230,7 +230,7 @@ def remove_touching_objects(
     return label_image
 
 
-def remove_thin_objects(label_image: np.ndarray, min_z: int = 2) -> np.ndarray:
+def remove_thin_objects(label_image, min_z=2):
     """Remove objects thinner than a specified minimum value in Z."""
     unique_labels = [
         regionlabel for regionlabel in np.unique(label_image) if regionlabel != 0
@@ -249,40 +249,30 @@ def remove_thin_objects(label_image: np.ndarray, min_z: int = 2) -> np.ndarray:
     return label_image
 
 
-def segment_watershed(
-    image: np.ndarray,
-    markers: Optional[np.ndarray] = None,
-    ball_size: int = 15,
-) -> np.ndarray:
+def segment_watershed(image, markers=None, ball_size=15):
     """Segment image using watershed algorithm."""
     device = get_device(image)
 
-    distance = np.asarray(distance_transform_edt(image))
-    coords = np.asarray(
-        feature.peak_local_max(
-            distance, footprint=morphology.ball(ball_size), labels=image
-        )
+    distance = distance_transform_edt(image)
+    coords = feature.peak_local_max(
+        distance, footprint=morphology.ball(ball_size), labels=image
     )
 
     # https://github.com/rapidsai/cucim/issues/89
     if markers is None:
         mask = np.zeros(distance.shape, dtype=bool)
         mask[tuple(asnumpy(coords.T))] = True
-        markers = np.asarray(label(mask))
-        labels = watershed(
-            -np.asarray(asnumpy(distance)), markers, mask=np.asarray(asnumpy(image))
-        )
+        markers = label(mask)
+        labels = watershed(-asnumpy(distance), markers, mask=asnumpy(image))
     else:
         labels = watershed(
-            np.asarray(asnumpy(image)),
-            markers=np.asarray(asnumpy(markers)),
-            mask=np.asarray(asnumpy(image)),
+            asnumpy(image), markers=asnumpy(markers), mask=asnumpy(image)
         )
     # return on the same device as input
     return to_device(labels, device)
 
 
-def _binary_fill_holes(image: np.ndarray) -> np.ndarray:
+def _binary_fill_holes(image):
     """Fill holes in binary objects."""
     if get_device(image) == "GPU":
         from cupyx.scipy.ndimage import binary_fill_holes
@@ -295,7 +285,7 @@ def _binary_fill_holes(image: np.ndarray) -> np.ndarray:
 
 
 def fill_label_holes(
-    lbl_img: np.ndarray, **binary_fill_holes_kwargs: Any
+    lbl_img: np.ndarray, **binary_fill_holes_kwargs: object
 ) -> np.ndarray:
     """
     Fill small holes in label image.

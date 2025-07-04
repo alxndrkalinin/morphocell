@@ -1,7 +1,7 @@
 """Implement 3D image segmentation using Cellpose."""
 
 import warnings
-from typing import Optional, List
+from typing import Optional, List, cast
 import numpy.typing as npt
 import numpy as np
 
@@ -67,7 +67,8 @@ def cellpose_segment(
         diameter=diameter,
         do_3D=do_3D,
     )
-    masks = remove_touching_objects(np.asarray(masks), border_value=border_value)
-    masks = clear_xy_borders(np.asarray(masks))
-    masks = remove_small_objects(np.asarray(masks), min_size=min_size)
+    masks = cast(np.ndarray, masks)
+    masks = remove_touching_objects(masks, border_value=border_value)
+    masks = clear_xy_borders(masks)
+    masks = remove_small_objects(masks, min_size=min_size)
     return masks

@@ -544,12 +544,18 @@ def five_crop_resolution(
     spacing_xy = (spacing[1], spacing[2])
     spacing_xz = (spacing[0], spacing[2])
 
-    locations = [crop_tl, crop_bl, crop_tr, crop_br, crop_center]
+    locations: list[Callable[[np.ndarray, int], np.ndarray]] = [
+        crop_tl,
+        crop_bl,
+        crop_tr,
+        crop_br,
+        lambda img, size: crop_center(img, size),
+    ]
     max_projection_resolutions = []
     xy_resolutions = []
     xz_resolutions = []
     for loc in locations:
-        loc_image = loc(image, crop_size)  # type: ignore
+        loc_image = loc(image, crop_size)
 
         max_projection_resolution = fsc_resolution(
             loc_image.max(0),

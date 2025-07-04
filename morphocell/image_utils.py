@@ -490,7 +490,7 @@ def reverse_checkerboard_split(
     return image1, image2
 
 
-def label(img: npt.ArrayLike, **kwargs: Any) -> npt.ArrayLike:
+def label(img: npt.ArrayLike, **kwargs: Any) -> np.ndarray:
     """Label image using skimage.measure.label."""
     return measure.label(img, **kwargs)
 
