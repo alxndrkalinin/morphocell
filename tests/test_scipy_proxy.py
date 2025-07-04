@@ -1,7 +1,7 @@
 import numpy as np
 
-from morphocell.cuda import CUDAManager, ascupy, asnumpy
 import morphocell.scipy as mc_scipy
+from morphocell.cuda import CUDAManager, ascupy, asnumpy
 
 
 def _gpu_available() -> bool:

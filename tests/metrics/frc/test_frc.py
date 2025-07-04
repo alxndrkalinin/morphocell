@@ -1,12 +1,12 @@
-from collections.abc import Sequence
 from typing import Any
+from collections.abc import Sequence
 
-import pytest
 import numpy as np
+import pytest
 from skimage import data
 
+from morphocell.cuda import CUDAManager, ascupy
 from morphocell.skimage import filters
-from morphocell.cuda import ascupy, CUDAManager
 from morphocell.metrics.frc import frc_resolution, fsc_resolution
 
 

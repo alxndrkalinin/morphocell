@@ -2,16 +2,15 @@
 
 import warnings
 from collections.abc import Sequence
-import numpy.typing as npt
 
 import numpy as np
+import numpy.typing as npt
 from skimage.segmentation import watershed
 
+from ..cuda import asnumpy, to_device, get_device
+from ..skimage import feature, filters, transform, morphology
+from ..image_utils import label, pad_image, distance_transform_edt
 from ._clear_border import clear_border
-
-from ..cuda import get_device, to_device, asnumpy
-from ..image_utils import pad_image, label, distance_transform_edt
-from ..skimage import transform, filters, morphology, feature
 
 
 def downscale_and_filter(
@@ -37,6 +36,7 @@ def downscale_and_filter(
     -------
     npt.ArrayLike
         Filtered and downsampled image.
+
     """
     # cuCIM does not yet support rank-based median filter
     # https://github.com/rapidsai/cucim/blob/main/python/cucim/src/cucim/skimage/filters/_median.py#L124
@@ -68,8 +68,7 @@ def downscale_and_filter(
 
 
 def check_labeled_binary(image):
-    """
-    Check if the given image is a labeled image.
+    """Check if the given image is a labeled image.
 
     Parameters
     ----------
@@ -79,6 +78,7 @@ def check_labeled_binary(image):
     Returns
     -------
     None
+
     """
     assert np.issubdtype(image.dtype, np.integer), "Image must be of integer type."
 
@@ -124,8 +124,7 @@ def cleanup_segmentation(
 
 
 def find_objects(label_image, max_label=None):
-    """
-    Find objects in a labeled nD array.
+    """Find objects in a labeled nD array.
 
     Parameters
     ----------
@@ -144,6 +143,7 @@ def find_objects(label_image, max_label=None):
         parallelepiped that contains the object. If a number is missing,
         None is returned instead of a slice. The label `l` corresponds to
         the index `l-1` in the returned list.
+
     """
     if max_label is None:
         max_label = int(np.max(label_image))
@@ -289,8 +289,7 @@ def _binary_fill_holes(image):
 
 
 def fill_label_holes(lbl_img, **binary_fill_holes_kwargs):
-    """
-    Fill small holes in label image.
+    """Fill small holes in label image.
 
     Inspired by: https://github.com/stardist/stardist/blob/master/stardist/utils.py
     """
@@ -326,8 +325,7 @@ def fill_holes_slicer(
     num_iterations: int = 1,
     axes: Sequence[int] | None = None,
 ):
-    """
-    Fill holes in slices of binary or labeled objects.
+    """Fill holes in slices of binary or labeled objects.
 
     Inspired by: https://github.com/True-North-Intelligent-Algorithms/tnia-python/blob/main/tnia/morphology/fill_holes.py
     """

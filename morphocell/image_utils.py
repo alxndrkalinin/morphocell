@@ -1,13 +1,13 @@
 """Implements utility functions that operate on 3D images."""
 
-from collections.abc import Sequence, Callable
 from typing import Any
-import numpy.typing as npt
+from collections.abc import Callable, Sequence
 
 import numpy as np
+import numpy.typing as npt
 
-from .cuda import get_array_module, asnumpy
-from .skimage import transform, exposure, measure
+from .cuda import asnumpy, get_array_module
+from .skimage import measure, exposure, transform
 
 
 # image operations assume ZYX channel order
@@ -390,9 +390,7 @@ def _nd_window(
     power_function: Callable[..., np.ndarray],
     **kwargs: Any,
 ) -> np.ndarray:
-    """
-    Perform on N-dimensional spatial-domain data to mitigate boundary effects in the FFT.
-    """
+    """Perform on N-dimensional spatial-domain data to mitigate boundary effects in the FFT."""
     result = data.copy().astype(np.float32)
     for axis, axis_size in enumerate(data.shape):
         # set up shape for numpy broadcasting
@@ -499,9 +497,7 @@ def label(img: npt.ArrayLike, **kwargs: Any) -> npt.ArrayLike:
 def select_max_contrast_slices(
     img: np.ndarray, num_slices: int = 128, return_indices: bool = False
 ) -> np.ndarray | tuple[np.ndarray, slice]:
-    """
-    Select num_slices consecutive Z slices with maximum contrast from a 3D volume.
-    """
+    """Select num_slices consecutive Z slices with maximum contrast from a 3D volume."""
     assert img.ndim > 2, "Image should have more than 2 dimensions."
     std_devs = asnumpy(img.std(tuple(range(1, img.ndim))))
     # calculate rolling sum of standard deviations for num_slices

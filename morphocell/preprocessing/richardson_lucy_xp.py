@@ -38,13 +38,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from collections.abc import Callable
 
 import numpy as np
-from morphocell.skimage import util
 
-from morphocell.image_utils import pad_image_to_shape, crop_center
 from morphocell.cuda import (
-    check_same_device,
     get_array_module,
+    check_same_device,
 )
+from morphocell.skimage import util
+from morphocell.image_utils import crop_center, pad_image_to_shape
 
 
 def richardson_lucy_xp(

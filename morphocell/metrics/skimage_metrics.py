@@ -1,13 +1,13 @@
 """Implements GPU-compatible metrics from scikit-image."""
 
+from typing import Any
 from functools import wraps
 from collections.abc import Callable
-from typing import Any
 
 import numpy as np
 
-from ..skimage import metrics
 from ..cuda import check_same_device
+from ..skimage import metrics
 
 
 def scale_invariant(fn: Callable) -> Callable:

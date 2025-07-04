@@ -1,8 +1,5 @@
 """Expose metrics functions."""
 
-from .average_precision import average_precision
-from .skimage_metrics import psnr, ssim
-from .feature import cosine_median, morphology_correlations
 from .frc import (
     frc_resolution,
     fsc_resolution,
@@ -10,6 +7,9 @@ from .frc import (
     grid_crop_resolution,
     frc_resolution_difference,
 )
+from .feature import cosine_median, morphology_correlations
+from .skimage_metrics import psnr, ssim
+from .average_precision import average_precision
 
 __all__ = [
     "psnr",

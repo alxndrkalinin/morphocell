@@ -1,12 +1,10 @@
 """Implement 3D image thresholding."""
 
+import numpy as np
 import numpy.typing as npt
 
-import numpy as np
-
-from ..image_utils import get_xy_block_coords, get_xy_block
-
-from ..skimage import filters, util
+from ..skimage import util, filters
+from ..image_utils import get_xy_block, get_xy_block_coords
 
 
 def get_threshold_otsu(

@@ -4,9 +4,8 @@ Executing regionprops on GPU currently does not provide performance gains, see:
 https://github.com/rapidsai/cucim/issues/241
 """
 
-import numpy.typing as npt
-
 import numpy as np
+import numpy.typing as npt
 
 from ..skimage import measure
 

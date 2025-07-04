@@ -1,6 +1,7 @@
 """Implement 3D image segmentation using Cellpose."""
 
 import warnings
+
 import numpy.typing as npt
 
 try:
@@ -12,10 +13,10 @@ except ImportError:
     warnings.warn("Cellpose is not available. Cellpose segmentation will not work.")
 
 from .segment_utils import (
-    downscale_and_filter,
-    remove_touching_objects,
     clear_xy_borders,
+    downscale_and_filter,
     remove_small_objects,
+    remove_touching_objects,
 )
 
 

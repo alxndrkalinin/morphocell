@@ -54,10 +54,11 @@
 # Copyright (c) 2009-2010, Laboratory of Systems Biology, Institute of
 # Cybernetics at Tallinn University of Technology. All rights reserved
 
+from argparse import Namespace
+
 import numpy as np
 import scipy.optimize as optimize
-from argparse import Namespace
-from scipy.interpolate import interp1d, UnivariateSpline
+from scipy.interpolate import UnivariateSpline, interp1d
 
 
 def get_frc_options(
@@ -70,7 +71,6 @@ def get_frc_options(
     verbose: bool = False,
 ) -> Namespace:
     """Return a :class:`argparse.Namespace` with common FRC/FSC parameters."""
-
     return Namespace(
         d_bin=bin_delta,
         d_angle=angle_delta,
@@ -86,8 +86,7 @@ def get_frc_options(
 
 
 class FixedDictionary(object):
-    """
-    A dictionary with immutable keys. Is initialized at construction
+    """A dictionary with immutable keys. Is initialized at construction
     with a list of key values.
     """
 
@@ -113,8 +112,7 @@ class FixedDictionary(object):
 
 
 def safe_divide(numerator, denominator):
-    """
-    Division of numpy arrays that can handle division by zero. NaN results are
+    """Division of numpy arrays that can handle division by zero. NaN results are
     coerced to zero. Also suppresses the division by zero warning.
     :param numerator:
     :param denominator:
@@ -127,9 +125,7 @@ def safe_divide(numerator, denominator):
 
 
 class FourierCorrelationDataCollection(object):
-    """
-    A container for the directional Fourier correlation data
-    """
+    """A container for the directional Fourier correlation data"""
 
     def __init__(self):
         self._data = {}
@@ -172,10 +168,7 @@ class FourierCorrelationDataCollection(object):
 
 
 class FourierCorrelationData(object):
-    """
-    A datatype for FRC data
-
-    """
+    """A datatype for FRC data"""
 
     # todo: the dictionary format here is a bit clumsy. Maybe change to a simpler structure
 
@@ -204,8 +197,7 @@ class FourierCorrelationData(object):
 
 
 def fit_frc_curve(data_set, degree, fit_type="spline"):
-    """
-    Calculate a least squares curve fit to the FRC Data
+    """Calculate a least squares curve fit to the FRC Data
     :return: None. Will modify the frc argument in place
     """
     assert isinstance(data_set, FourierCorrelationData)
@@ -244,8 +236,7 @@ def fit_frc_curve(data_set, degree, fit_type="spline"):
 
 
 def calculate_snr_threshold_value(points_x_bin, snr):
-    """
-    A function to calculate a SNR based resolution threshold, as described
+    """A function to calculate a SNR based resolution threshold, as described
     in ...
 
     :param points_x_bin: a 1D Array containing the numbers of points at each
@@ -259,8 +250,7 @@ def calculate_snr_threshold_value(points_x_bin, snr):
 
 
 def calculate_resolution_threshold_curve(data_set, criterion, threshold, snr):
-    """
-    Calculate the two sigma curve. The FRC should be run first, as the results of the two sigma
+    """Calculate the two sigma curve. The FRC should be run first, as the results of the two sigma
     depend on the number of points on the fourier rings.
 
     :return:  Adds the
@@ -339,13 +329,11 @@ class FourierCorrelationAnalysis(object):
         self.verbose = verbose
 
     def execute(self, z_correction=1):
-        """
-        Calculate the spatial resolution as a cross-section of the FRC and Two-sigma curves.
+        """Calculate the spatial resolution as a cross-section of the FRC and Two-sigma curves.
 
         :return: Returns the calculation results. They are also saved inside the class.
                  The return value is just for convenience.
         """
-
         criterion = self.resolution_threshold
         threshold = self.threshold_value
         snr = self.snr_value

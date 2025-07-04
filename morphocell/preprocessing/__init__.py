@@ -1,13 +1,13 @@
 """Expose preprocessing functions."""
 
+from .thresholding import get_threshold_otsu, select_nonempty_patches
 from .deconvolution import (
-    richardson_lucy_skimage,
-    richardson_lucy_xp,
-    decon_skimage,
     decon_xpy,
+    decon_skimage,
+    richardson_lucy_xp,
     deconv_iter_num_finder,
+    richardson_lucy_skimage,
 )
-from .thresholding import select_nonempty_patches, get_threshold_otsu
 
 __all__ = [
     "richardson_lucy_skimage",

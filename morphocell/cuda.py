@@ -1,11 +1,10 @@
 """Contains a class for accessing CUDA-accelerated libraries."""
 
-from types import ModuleType
-from collections.abc import Callable
-from typing import Any
-
-import warnings
 import os
+import warnings
+from types import ModuleType
+from typing import Any
+from collections.abc import Callable
 
 import numpy as np
 

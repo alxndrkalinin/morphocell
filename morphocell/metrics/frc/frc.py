@@ -1,30 +1,30 @@
 """Implements 2D/3D Fourier Ring/Shell Correlation."""
 
-from collections.abc import Sequence, Callable
+from collections.abc import Callable, Sequence
 
 import numpy as np
 
 from morphocell.cuda import asnumpy
 from morphocell.image_utils import (
-    crop_tl,
     crop_bl,
-    crop_tr,
     crop_br,
-    crop_center,
+    crop_tl,
+    crop_tr,
     pad_image,
-    get_xy_block_coords,
-    pad_image_to_cube,
+    crop_center,
     hamming_window,
+    pad_image_to_cube,
     checkerboard_split,
+    get_xy_block_coords,
     reverse_checkerboard_split,
 )
 
-from .iterators import FourierRingIterator, AxialExcludeSectionedFourierShellIterator
 from .analysis import (
     FourierCorrelationData,
-    FourierCorrelationDataCollection,
     FourierCorrelationAnalysis,
+    FourierCorrelationDataCollection,
 )
+from .iterators import FourierRingIterator, AxialExcludeSectionedFourierShellIterator
 
 
 def _empty_aggregate(*args: np.ndarray, **kwargs) -> np.ndarray:
@@ -52,7 +52,6 @@ def preprocess_images(
     disable_3d_sum: bool = False,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Preprocess input images with all modifications (padding, windowing, splitting)."""
-
     single_image = image2 is None
 
     # Apply padding to first image
@@ -179,7 +178,6 @@ def calculate_frc(
     zero_padding: bool = True,
 ) -> FourierCorrelationData:
     """Calculate a regular FRC with single or two image inputs."""
-
     single_image = image2 is None
     reverse = average and single_image
     original_image1 = image1.copy() if reverse else None
@@ -246,7 +244,6 @@ def frc_resolution(
     curve_fit_type: str = "smooth-spline",
 ) -> float:
     """Calculate either single- or two-image FRC-based 2D image resolution."""
-
     frc_result = calculate_frc(
         image1,
         image2,
@@ -270,7 +267,6 @@ class DirectionalFSC(object):
         normalize_power: bool = False,
     ):
         """Initialize the directional FSC."""
-
         if image1.ndim != 3 or image1.shape[0] <= 1:
             raise ValueError("Image must be 3D")
 
@@ -366,7 +362,6 @@ def calculate_sectioned_fsc(
     zero_padding: bool = True,
 ) -> FourierCorrelationDataCollection:
     """Calculate sectioned FSC for one or two images."""
-
     single_image = image2 is None
 
     if isinstance(spacing, (int, float)):
@@ -419,7 +414,6 @@ def fsc_resolution(
     spacing: float | Sequence[float] = 1.0,
 ) -> dict[str, float]:
     """Calculate either single- or two-image FSC-based 3D image resolution."""
-
     fsc_result = calculate_sectioned_fsc(
         image1,
         image2,

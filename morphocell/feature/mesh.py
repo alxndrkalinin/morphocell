@@ -7,8 +7,8 @@ import numpy as np
 import trimesh
 from skimage.measure import marching_cubes
 from trimesh.curvature import (
-    discrete_gaussian_curvature_measure,
     discrete_mean_curvature_measure,
+    discrete_gaussian_curvature_measure,
 )
 
 from ..cuda import asnumpy

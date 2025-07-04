@@ -45,7 +45,6 @@ import numpy as np
 from morphocell.skimage import exposure
 from morphocell.image_utils import rotate_image
 
-
 # ---------------------------------------------------------------------------
 # Helper utilities
 # ---------------------------------------------------------------------------

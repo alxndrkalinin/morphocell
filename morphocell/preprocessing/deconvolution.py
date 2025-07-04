@@ -6,13 +6,14 @@ from collections.abc import Callable
 
 import numpy as np
 
-from morphocell.skimage import restoration, util  # noqa: F401
-from morphocell.image_utils import pad_image
 from morphocell.cuda import (
     asnumpy,
-    check_same_device,
     to_same_device,
+    check_same_device,
 )
+from morphocell.skimage import util, restoration  # noqa: F401
+from morphocell.image_utils import pad_image
+
 from .richardson_lucy_xp import richardson_lucy_xp
 
 
@@ -25,7 +26,6 @@ def richardson_lucy_skimage(
     filter_epsilon: float | None = None,
 ) -> np.ndarray:
     """Lucy-Richardson deconvolution using morphocell.skimage."""
-
     rl_partial = partial(
         restoration.richardson_lucy,
         psf=psf,
@@ -170,6 +170,7 @@ def richardson_lucy_iter(
     ------
     ValueError
         If implementation is not "skimage" or "xp".
+
     """
     if implementation == "skimage":
         return decon_skimage(
@@ -219,6 +220,7 @@ def deconv_iter_num_finder(
         Which LR implementation to use, ``"skimage"`` (default) or ``"xpy"``.
     noncirc : bool, optional
         When ``implementation='xpy'``, enable non-circulant edge handling.
+
     """
     verboseprint = print if verbose else lambda *a, **k: None
 
