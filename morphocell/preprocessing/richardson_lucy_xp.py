@@ -1,5 +1,4 @@
-
-'''This module implements the Richardson-Lucy deconvolution algorithm using either NumPy or CuPy.
+"""This module implements the Richardson-Lucy deconvolution algorithm using either NumPy or CuPy.
 
 Modified from https://github.com/True-North-Intelligent-Algorithms/tnia-python/blob/main/tnia/deconvolution/richardson_lucy.py
 
@@ -34,7 +33,7 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-'''
+"""
 
 from collections.abc import Callable
 
@@ -45,8 +44,8 @@ from morphocell.image_utils import pad_image_to_shape, crop_center
 from morphocell.cuda import (
     check_same_device,
     get_array_module,
-
 )
+
 
 def richardson_lucy_xp(
     image: np.ndarray,

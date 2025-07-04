@@ -135,7 +135,7 @@ def richardson_lucy_iter(
     mask: np.ndarray | None = None,
 ) -> np.ndarray:
     """Unified Richardson-Lucy deconvolution function with iteration observer function.
-    
+
     Parameters
     ----------
     image : np.ndarray
@@ -160,12 +160,12 @@ def richardson_lucy_iter(
         Enable non-circulant edge handling (xp only).
     mask : np.ndarray | None, default=None
         Mask array (xp only).
-        
+
     Returns
     -------
     np.ndarray
         Deconvolved image.
-        
+
     Raises
     ------
     ValueError
@@ -194,8 +194,9 @@ def richardson_lucy_iter(
             observer_fn=observer_fn,
         )
     else:
-        raise ValueError(f"Unknown implementation: {implementation}. Use 'skimage' or 'xp'.")
-
+        raise ValueError(
+            f"Unknown implementation: {implementation}. Use 'skimage' or 'xp'."
+        )
 
 
 def deconv_iter_num_finder(
