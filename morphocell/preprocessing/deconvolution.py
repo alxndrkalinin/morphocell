@@ -11,7 +11,7 @@ from skimage import io
 from morphocell.skimage import restoration, util  # noqa: F401
 import math
 
-from morphocell.image_utils import pad_image
+from morphocell.image_utils import pad_image, pad_image_to_shape, crop_center
 from morphocell.cuda import (
     asnumpy,
     ascupy,
@@ -22,14 +22,14 @@ from morphocell.cuda import (
 
 
 def richardson_lucy_skimage(
-    image: np.array,
-    psf: np.array,
+    image: np.ndarray,
+    psf: np.ndarray,
     n_iter: int = 10,
     observer_fn: Callable | None = None,
     clip: bool = True,
     filter_epsilon: float | None = None,
 ) -> np.ndarray:
-    """Lucy-Richardson deconvolution using :mod:`morphocell.skimage`."""
+    """Lucy-Richardson deconvolution using morphocell.skimage."""
 
     rl_partial = partial(
         restoration.richardson_lucy,
@@ -87,37 +87,13 @@ def decon_skimage(
     return decon_image
 
 
-def _pad_nd(
-    img: np.array,
-    padded_size: tuple[int, ...],
-    mode: str,
-    xp: Any,
-) -> tuple[np.ndarray, tuple[tuple[int, int], ...]]:
-    """Pad array to ``padded_size`` using ``xp.pad``."""
-    padding = tuple(
-        (math.ceil((i - j) / 2), math.floor((i - j) / 2))
-        for i, j in zip(padded_size, img.shape)
-    )
-    return xp.pad(img, padding, mode), padding
-
-
-def _unpad_nd(padded: np.array, img_size: tuple[int, ...], xp: Any) -> np.ndarray:
-    """Crop padded array back to ``img_size``."""
-    padding = tuple(
-        (math.ceil((i - j) / 2), math.floor((i - j) / 2))
-        for i, j in zip(padded.shape, img_size)
-    )
-    slices = tuple(slice(p[0], p[0] + s) for p, s in zip(padding, img_size))
-    return padded[slices]
-
-
 def richardson_lucy_xp(
-    image: np.array,
-    psf: np.array,
+    image: np.ndarray,
+    psf: np.ndarray,
     n_iter: int = 10,
     *,
     noncirc: bool = False,
-    mask: np.array | None = None,
+    mask: np.ndarray | None = None,
     observer_fn: Callable | None = None,
 ) -> np.ndarray:
     """Lucy-Richardson deconvolution implemented with NumPy or CuPy."""
@@ -127,7 +103,7 @@ def richardson_lucy_xp(
     psf = util.img_as_float(psf)
 
     if not noncirc and image.shape != psf.shape:
-        psf, _ = _pad_nd(psf, image.shape, "constant", xp)
+        psf = pad_image_to_shape(psf, image.shape, mode="constant")
 
     mask_values = None
     if mask is not None:
@@ -138,13 +114,13 @@ def richardson_lucy_xp(
     if noncirc:
         orig_size = image.shape
         ext_size = [image.shape[i] + psf.shape[i] - 1 for i in range(image.ndim)]
-        psf, _ = _pad_nd(psf, ext_size, "constant", xp)
+        psf = pad_image_to_shape(psf, ext_size, mode="constant")
 
     psf = xp.fft.fftn(xp.fft.ifftshift(psf))
     otf_conj = xp.conjugate(psf)
 
     if noncirc:
-        image, _ = _pad_nd(image, ext_size, "constant", xp)
+        image = pad_image_to_shape(image, ext_size, mode="constant")
         estimate = xp.full_like(image, xp.mean(image))
     else:
         estimate = image
@@ -167,7 +143,7 @@ def richardson_lucy_xp(
 
         if observer_fn is not None:
             if noncirc:
-                unpadded_estimate = _unpad_nd(estimate, orig_size, xp)
+                unpadded_estimate = crop_center(estimate, orig_size)
                 observer_fn(unpadded_estimate, i)
             else:
                 observer_fn(estimate, i)
@@ -175,7 +151,7 @@ def richardson_lucy_xp(
     del psf, otf_conj, htones
 
     if noncirc:
-        estimate = _unpad_nd(estimate, orig_size, xp)
+        estimate = crop_center(estimate, orig_size)
 
     if mask is not None:
         estimate = estimate * mask + mask_values
@@ -191,7 +167,7 @@ def decon_xpy(
     pad_size_z: int = 0,
     *,
     noncirc: bool = False,
-    mask: np.array | None = None,
+    mask: np.ndarray | None = None,
     observer_fn: Callable | None = None,
 ) -> np.ndarray:
     """Perform NumPy-based deconvolution with optional non-circulant edges."""
@@ -223,8 +199,8 @@ def decon_xpy(
 
 
 def deconv_iter_num_finder(
-    image: str | Path | np.array,
-    psf: str | Path | np.array,
+    image: str | Path | np.ndarray,
+    psf: str | Path | np.ndarray,
     metric_fn: Callable,
     metric_threshold: int | float,
     metric_kwargs: dict[str, Any] | None = None,
