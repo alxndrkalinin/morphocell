@@ -19,3 +19,25 @@ def test_threshold_and_patch_selection() -> None:
         img, patch_size=10, min_nonzeros=0.5, threshold=th
     )
     assert len(patches) >= 1
+
+
+def test_select_nonempty_patches_empty() -> None:
+    """No patches should be returned when threshold is high."""
+    img = np.zeros((2, 10, 10), dtype=np.float32)
+    patches = select_nonempty_patches(
+        img, patch_size=10, min_nonzeros=0.5, threshold=1.0
+    )
+    assert patches == []
+
+
+def test_select_nonempty_patches_threshold_bounds() -> None:
+    """Boundary threshold values should behave as expected."""
+    img = np.ones((2, 10, 10), dtype=np.float32)
+    patches_lo = select_nonempty_patches(
+        img, patch_size=10, min_nonzeros=1.0, threshold=0.0
+    )
+    assert len(patches_lo) == 1
+    patches_hi = select_nonempty_patches(
+        img, patch_size=10, min_nonzeros=1.0, threshold=1.0
+    )
+    assert patches_hi == []
