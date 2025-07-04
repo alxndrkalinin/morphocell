@@ -1,13 +1,10 @@
 """Implement 3D image thresholding."""
 
-from typing import List, Optional
+import numpy as np
 import numpy.typing as npt
 
-import numpy as np
-
-from ..image_utils import get_xy_block_coords, get_xy_block
-
-from ..skimage import filters, util
+from ..skimage import util, filters
+from ..image_utils import get_xy_block, get_xy_block_coords
 
 
 def get_threshold_otsu(
@@ -25,9 +22,9 @@ def select_nonempty_patches(
     image: npt.ArrayLike,
     patch_size: int = 512,
     min_nonzeros: float = 0.02,
-    threshold: Optional[float] = None,
+    threshold: float | None = None,
     verbose: bool = False,
-) -> List[List[int]]:
+) -> list[list[int]]:
     """Select XY patches from 3D image by percent of nonzero voxels."""
     verboseprint = print if verbose else lambda *a, **k: None
 

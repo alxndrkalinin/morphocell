@@ -3,8 +3,8 @@
 import numpy as np
 
 from morphocell.cuda import to_same_device
-from morphocell.metrics.average_precision import compute_matches
 from morphocell.feature.voxel import extract_features, norm_features_by_range
+from morphocell.metrics.average_precision import compute_matches
 
 
 def _calculate_cosine(true_features: np.ndarray, pred_features: np.ndarray) -> float:

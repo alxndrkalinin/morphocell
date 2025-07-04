@@ -14,7 +14,7 @@ https://github.com/MouseLand/cellpose/blob/509ffca33737058b0b4e2e96d506514e10620
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
-from ..cuda import get_device, asnumpy, ascupy
+from ..cuda import ascupy, asnumpy, get_device
 
 
 def _check_sequential_labels(mask: np.ndarray) -> bool:
@@ -27,8 +27,9 @@ def _label_overlap_gpu(x: np.ndarray, y: np.ndarray) -> np.ndarray:
 
     Copyright (c) 2024 Alexandr Kalinin
     """
-    from cupyx import jit
     import warnings
+
+    from cupyx import jit
 
     x = x.ravel().astype(np.uint32)
     y = y.ravel().astype(np.uint32)

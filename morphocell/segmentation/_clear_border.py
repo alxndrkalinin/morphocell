@@ -31,10 +31,12 @@ def clear_border(
     out : ndarray
         Array of the same shape as `labels`, into which the
         output is placed. By default, a new array is created.
+
     Returns
     -------
     out : (M[, N[, ..., P]]) array
         Imaging data labels with cleared borders
+
     Examples
     --------
     >>> import numpy as np
@@ -65,6 +67,7 @@ def clear_border(
            [0, 0, 0, 1, 1, 1, 1, 0, 0],
            [0, 1, 1, 1, 1, 1, 1, 1, 0],
            [0, 0, 0, 0, 0, 0, 0, 0, 0]])
+
     """
     xp = get_array_module(labels)
 

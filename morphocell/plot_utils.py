@@ -1,7 +1,6 @@
 """Implements functions to display images and graphs."""
 
 import numpy as np
-
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 

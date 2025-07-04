@@ -4,18 +4,16 @@ Executing regionprops on GPU currently does not provide performance gains, see:
 https://github.com/rapidsai/cucim/issues/241
 """
 
-from typing import Optional
-import numpy.typing as npt
-
 import numpy as np
+import numpy.typing as npt
 
 from ..skimage import measure
 
 
 def regionprops(
     label_image: npt.ArrayLike,
-    intensity_image: Optional[npt.ArrayLike] = None,
-    spacing: Optional[list[float]] = None,
+    intensity_image: npt.ArrayLike | None = None,
+    spacing: list[float] | None = None,
 ) -> list:
     """Extract region-based morphological features."""
     return measure.regionprops(label_image, intensity_image, spacing=spacing)
@@ -23,9 +21,9 @@ def regionprops(
 
 def regionprops_table(
     label_image: npt.ArrayLike,
-    intensity_image: Optional[npt.ArrayLike] = None,
-    properties: Optional[list[str]] = None,
-    spacing: Optional[list[float]] = None,
+    intensity_image: npt.ArrayLike | None = None,
+    properties: list[str] | None = None,
+    spacing: list[float] | None = None,
 ) -> dict[str, np.ndarray]:
     """Extract region-based morphological features and return in pandas-compatible format."""
     if properties is not None:
@@ -40,7 +38,7 @@ def regionprops_table(
 def extract_features(
     label_image: npt.ArrayLike,
     features: list[str],
-    feature_ranges: Optional[dict[str, tuple[float, float]]] = None,
+    feature_ranges: dict[str, tuple[float, float]] | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Extract features from a label image using regionprops."""
     image_props = regionprops_table(label_image, properties=features)
@@ -83,8 +81,8 @@ def norm_features_by_range(
 def calculate_feature_percentiles(
     regionprops_dict: dict[str, np.ndarray],
     percentiles: tuple[float, ...] = (0.01, 0.99),
-    features_include: Optional[list[str]] = None,
-    features_exclude: Optional[list[str]] = None,
+    features_include: list[str] | None = None,
+    features_exclude: list[str] | None = None,
 ) -> dict[str, np.ndarray]:
     """Calculate percentiles of features in regionprops."""
     percentile_values = np.asarray(percentiles) * 100

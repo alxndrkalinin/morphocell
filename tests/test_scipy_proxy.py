@@ -1,7 +1,9 @@
+"""Tests for the SciPy proxy implementation."""
+
 import numpy as np
 
-from morphocell.cuda import CUDAManager, ascupy, asnumpy
 import morphocell.scipy as mc_scipy
+from morphocell.cuda import CUDAManager, ascupy, asnumpy
 
 
 def _gpu_available() -> bool:
@@ -9,6 +11,7 @@ def _gpu_available() -> bool:
 
 
 def test_ndimage_laplace_cpu_vs_gpu() -> None:
+    """Compare Laplace filter on CPU and GPU."""
     a = np.asarray([1, 2, 3], dtype=float)
     cpu_res = mc_scipy.ndimage.laplace(a)
 

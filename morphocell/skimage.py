@@ -1,9 +1,10 @@
 """Wraps scikit-image submodules dynamically for device awareness."""
 
-from functools import wraps
 from types import ModuleType
-from typing import Callable, Any
+from typing import Any
+from functools import wraps
 from importlib import import_module
+from collections.abc import Callable
 
 from .cuda import CUDAManager
 

@@ -1,10 +1,10 @@
 """Contains a class for accessing CUDA-accelerated libraries."""
 
-from types import ModuleType
-from typing import Any, Callable
-
-import warnings
 import os
+import warnings
+from types import ModuleType
+from typing import Any
+from collections.abc import Callable
 
 import numpy as np
 
@@ -118,59 +118,3 @@ def ascupy(array: np.ndarray) -> object:
     if cp is not None:
         return cp.asarray(array)
     raise RuntimeError("GPU requested but not available.")
-
-
-class RunAsCUDASubprocess:
-    """Decorator to run TensorFlow in a separate process."""
-
-    def __init__(self, num_gpus: int = 0, memory_fraction: float = 0.8) -> None:
-        """Initialize decorator with number of GPUs and amount of available memory."""
-        self._num_gpus = num_gpus
-        self._memory_fraction = memory_fraction
-
-    @staticmethod
-    def _subprocess_code(
-        num_gpus: int, memory_fraction: float, fn: bytes, args: tuple
-    ) -> Any:
-        # set the env vars inside the subprocess so that we don't alter the parent env
-        os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see tensorflow issue #152
-        try:
-            import py3nvml
-
-            num_grabbed = py3nvml.grab_gpus(num_gpus, gpu_fraction=memory_fraction)
-        except ImportError:
-            # either CUDA is not installed on the system or py3nvml is not installed (which probably means the env
-            # does not have CUDA-enabled packages). Either way, block the visible devices to be sure.
-            num_grabbed = 0
-            os.environ["CUDA_VISIBLE_DEVICES"] = ""
-
-        assert num_grabbed == num_gpus, (
-            f"Could not grab {num_gpus} GPU devices with {memory_fraction * 100}% memory available"
-        )
-
-        if os.environ["CUDA_VISIBLE_DEVICES"] == "":
-            os.environ["CUDA_VISIBLE_DEVICES"] = (
-                "-1"  # see tensorflow issues: #16284, #2175
-            )
-
-        # using cloudpickle because it is more flexible about what functions it will
-        # pickle (lambda functions, notebook code, etc.)
-        import cloudpickle
-
-        return cloudpickle.loads(fn)(*args)
-
-    def __call__(self, f: Callable) -> Callable:
-        """Spawn a separate process to run wrapped TensorFlow function."""
-
-        def wrapped_f(*args: tuple) -> Any:
-            """Wrap the function to run in a separate process."""
-            import cloudpickle
-            import multiprocessing as mp
-
-            with mp.get_context("spawn").Pool(1) as p:
-                return p.apply(
-                    RunAsCUDASubprocess._subprocess_code,
-                    (self._num_gpus, self._memory_fraction, cloudpickle.dumps(f), args),
-                )
-
-        return wrapped_f

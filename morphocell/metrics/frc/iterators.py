@@ -38,13 +38,12 @@
 # mypy: ignore-errors
 
 from math import floor
-from typing import Iterable
+from collections.abc import Iterable
 
 import numpy as np
 
 from morphocell.skimage import exposure
 from morphocell.image_utils import rotate_image
-
 
 # ---------------------------------------------------------------------------
 # Helper utilities
@@ -176,21 +175,26 @@ class FourierRingIterator:
 
     @property
     def radii(self) -> np.ndarray:
+        """Radii for the concentric rings."""
         return self._radii
 
     @property
     def nbins(self) -> int:
+        """Number of available rings."""
         return self._nbins
 
     def get_points_on_ring(self, ring_start: int, ring_stop: int) -> np.ndarray:
+        """Return boolean mask for points on a ring."""
         arr_inf = self.r >= ring_start
         arr_sup = self.r < ring_stop
         return np.logical_and(arr_inf, arr_sup)
 
     def __iter__(self) -> "FourierRingIterator":
+        """Return iterator over rings."""
         return self
 
     def __next__(self):  # -> tuple[tuple[np.ndarray, np.ndarray], int]
+        """Return mask and index for the next ring."""
         if self.current_ring < self._nbins:
             ring = self.get_points_on_ring(
                 self.current_ring * self.d_bin, (self.current_ring + 1) * self.d_bin
@@ -217,6 +221,7 @@ class SectionedFourierRingIterator(FourierRingIterator):
 
     @property
     def angle(self) -> float:
+        """Current rotation angle in radians."""
         return self._angle
 
     @angle.setter
@@ -226,15 +231,18 @@ class SectionedFourierRingIterator(FourierRingIterator):
         self.angle_sector = self.get_angle_sector(angle, angle + self.d_angle)
 
     def get_angle_sector(self, phi_min: float, phi_max: float) -> np.ndarray:
+        """Return mask for the angular sector between ``phi_min`` and ``phi_max``."""
         return _angle_mask(self.phi, phi_min, phi_max)
 
     def __getitem__(self, limits: tuple[int, int, float, float]):
+        """Return coordinates for a ring section defined by ``limits``."""
         ring_start, ring_stop, angle_min, angle_max = limits
         ring = self.get_points_on_ring(ring_start, ring_stop)
         cone = self.get_angle_sector(angle_min, angle_max)
         return np.where(ring * cone)
 
     def __next__(self):
+        """Return next ring limited to the selected angular sector."""
         if self.current_ring < self._nbins:
             ring = self.get_points_on_ring(
                 self.current_ring * self.d_bin, (self.current_ring + 1) * self.d_bin
@@ -263,26 +271,32 @@ class FourierShellIterator:
 
     @property
     def steps(self) -> np.ndarray:
+        """Available shell radii."""
         return self.radii
 
     @property
     def nyquist(self) -> int:
+        """Nyquist frequency for the current shape."""
         return self.freq_nyq
 
     def get_points_on_shell(self, shell_start: int, shell_stop: int) -> np.ndarray:
+        """Return boolean mask for points within a shell."""
         arr_inf = self.r >= shell_start
         arr_sup = self.r < shell_stop
         return arr_inf * arr_sup
 
     def __getitem__(self, limits: tuple[int, int]):
+        """Return coordinates for points within ``limits`` shell."""
         shell_start, shell_stop = limits
         shell = self.get_points_on_shell(shell_start, shell_stop)
         return np.where(shell)
 
     def __iter__(self) -> "FourierShellIterator":
+        """Return iterator over shells."""
         return self
 
     def __next__(self):
+        """Return mask and index for the next shell."""
         shell_idx = self.current_shell
         if shell_idx <= self.shell_stop:
             shell = self.get_points_on_shell(
@@ -312,12 +326,15 @@ class SectionedFourierShellIterator(FourierShellIterator):
 
     @property
     def steps(self):
+        """Radii and angles covered by the iterator."""
         return self.radii, self.angles
 
     def get_angle_sector(self, phi_min: float, phi_max: float) -> np.ndarray:
+        """Return mask for an angular sector of a shell."""
         return _angle_mask(self.phi, phi_min, phi_max)
 
     def __getitem__(self, limits: tuple[int, int, float, float]):
+        """Return coordinates for a shell sector defined by ``limits``."""
         shell_start, shell_stop, angle_min, angle_max = limits
         angle_min = np.deg2rad(angle_min)
         angle_max = np.deg2rad(angle_max)
@@ -326,6 +343,7 @@ class SectionedFourierShellIterator(FourierShellIterator):
         return np.where(shell * cone)
 
     def __next__(self):
+        """Return coordinates for the next shell-angle pair."""
         rotation_idx = self.current_rotation
         shell_idx = self.current_shell
         if rotation_idx <= self.rotation_stop and shell_idx <= self.shell_stop:
@@ -358,6 +376,7 @@ class HollowSectionedFourierShellIterator(SectionedFourierShellIterator):
         self.d_extract_angle = np.deg2rad(d_extract_angle)
 
     def get_angle_sector(self, phi_min: float, phi_max: float) -> np.ndarray:
+        """Return sector mask with a hollowed center."""
         full_section = _angle_mask(self.phi, phi_min, phi_max)
         sector_center = phi_min + (phi_max - phi_min) / 2
         phi_min_ext = sector_center - self.d_extract_angle
@@ -376,6 +395,7 @@ class AxialExcludeSectionedFourierShellIterator(HollowSectionedFourierShellItera
         self.d_extract_angle = np.deg2rad(d_extract_angle)
 
     def get_angle_sector(self, phi_min: float, phi_max: float) -> np.ndarray:
+        """Return sector mask excluding regions near the axis."""
         full_section = _angle_mask(self.phi, phi_min, phi_max)
         axis_pos = np.deg2rad(90) + self.d_angle / 2
         axis_neg = np.deg2rad(270) + self.d_angle / 2
@@ -411,9 +431,11 @@ class RotatingFourierShellIterator(FourierShellIterator):
 
     @property
     def steps(self):
+        """Radii and rotation angles."""
         return self.radii, self.angles
 
     def __getitem__(self, limits: tuple[int, int, float]):
+        """Return coordinates from a rotated plane within a shell."""
         shell_start, shell_stop, angle = limits
         rotated_plane = rotate_image(self.plane, angle)
         points_on_plane = rotated_plane > 0
@@ -421,6 +443,7 @@ class RotatingFourierShellIterator(FourierShellIterator):
         return np.where(points_on_plane * points_on_shell)
 
     def __next__(self):
+        """Return coordinates for the next rotated shell."""
         rotation_idx = self.current_rotation + 1
         shell_idx = self.current_shell
         if shell_idx <= self.shell_stop:

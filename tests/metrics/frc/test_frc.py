@@ -1,11 +1,14 @@
-from typing import Sequence, Any
+"""Tests for FRC and FSC resolution calculations."""
 
-import pytest
+from typing import Any
+from collections.abc import Sequence
+
 import numpy as np
+import pytest
 from skimage import data
 
+from morphocell.cuda import CUDAManager, ascupy
 from morphocell.skimage import filters
-from morphocell.cuda import ascupy, CUDAManager
 from morphocell.metrics.frc import frc_resolution, fsc_resolution
 
 
@@ -99,6 +102,7 @@ def _assert_positive(result: Any) -> None:
 def test_calculate_frc_cpu_vs_gpu(
     cells_volume: tuple[np.ndarray, list[float]],
 ) -> None:
+    """Compare FRC resolution calculated on CPU and GPU."""
     volume, spacing = cells_volume
     slice_image = _middle_slice(volume)
 
@@ -116,6 +120,7 @@ def test_calculate_frc_cpu_vs_gpu(
 def test_calculate_fsc_cpu_vs_gpu(
     cells_volume: tuple[np.ndarray, list[float]],
 ) -> None:
+    """Compare FSC resolution calculated on CPU and GPU."""
     volume, spacing = cells_volume
 
     rng = np.random.default_rng(42)

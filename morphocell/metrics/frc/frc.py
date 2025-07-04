@@ -1,31 +1,30 @@
 """Implements 2D/3D Fourier Ring/Shell Correlation."""
 
-from typing import Sequence, Callable
+from collections.abc import Callable, Sequence
 
 import numpy as np
 
 from morphocell.cuda import asnumpy
 from morphocell.image_utils import (
-    crop_tl,
     crop_bl,
-    crop_tr,
     crop_br,
-    crop_center,
+    crop_tl,
+    crop_tr,
     pad_image,
-    get_xy_block_coords,
-    rescale_isotropic,
-    pad_image_to_cube,
+    crop_center,
     hamming_window,
+    pad_image_to_cube,
     checkerboard_split,
+    get_xy_block_coords,
     reverse_checkerboard_split,
 )
 
-from .iterators import FourierRingIterator, AxialExcludeSectionedFourierShellIterator
 from .analysis import (
     FourierCorrelationData,
-    FourierCorrelationDataCollection,
     FourierCorrelationAnalysis,
+    FourierCorrelationDataCollection,
 )
+from .iterators import FourierRingIterator, AxialExcludeSectionedFourierShellIterator
 
 
 def _empty_aggregate(*args: np.ndarray, **kwargs) -> np.ndarray:
@@ -53,7 +52,6 @@ def preprocess_images(
     disable_3d_sum: bool = False,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Preprocess input images with all modifications (padding, windowing, splitting)."""
-
     single_image = image2 is None
 
     # Apply padding to first image
@@ -180,7 +178,6 @@ def calculate_frc(
     zero_padding: bool = True,
 ) -> FourierCorrelationData:
     """Calculate a regular FRC with single or two image inputs."""
-
     single_image = image2 is None
     reverse = average and single_image
     original_image1 = image1.copy() if reverse else None
@@ -247,7 +244,6 @@ def frc_resolution(
     curve_fit_type: str = "smooth-spline",
 ) -> float:
     """Calculate either single- or two-image FRC-based 2D image resolution."""
-
     frc_result = calculate_frc(
         image1,
         image2,
@@ -271,7 +267,6 @@ class DirectionalFSC(object):
         normalize_power: bool = False,
     ):
         """Initialize the directional FSC."""
-
         if image1.ndim != 3 or image1.shape[0] <= 1:
             raise ValueError("Image must be 3D")
 
@@ -367,7 +362,6 @@ def calculate_sectioned_fsc(
     zero_padding: bool = True,
 ) -> FourierCorrelationDataCollection:
     """Calculate sectioned FSC for one or two images."""
-
     single_image = image2 is None
 
     if isinstance(spacing, (int, float)):
@@ -420,7 +414,6 @@ def fsc_resolution(
     spacing: float | Sequence[float] = 1.0,
 ) -> dict[str, float]:
     """Calculate either single- or two-image FSC-based 3D image resolution."""
-
     fsc_result = calculate_sectioned_fsc(
         image1,
         image2,
@@ -595,35 +588,13 @@ def frc_resolution_difference(
     image1: np.ndarray,
     image2: np.ndarray,
     *,
+    bin_delta: int = 3,
     spacing: float | tuple[float, float] = 1.0,
-    downscale_xy: bool = False,
-    axis: str = "xy",
-    frc_bin_delta: int = 3,
-    aggregate: Callable = np.mean,
 ) -> float:
     """Calculate difference between FRC-based resulutions of two images."""
     if isinstance(spacing, (int, float)):
-        spacing = (spacing, spacing, spacing)
-    if np.any(np.asarray(spacing) != 1.0):
-        image1 = rescale_isotropic(
-            image1, voxel_sizes=spacing, downscale_xy=downscale_xy
-        )
-        image2 = rescale_isotropic(
-            image2, voxel_sizes=spacing, downscale_xy=downscale_xy
-        )
+        spacing = (spacing, spacing)
 
-    image1_res = grid_crop_resolution(
-        image1,
-        bin_delta=frc_bin_delta,
-        spacing=spacing,
-        aggregate=aggregate,
-    )
-    image2_res = grid_crop_resolution(
-        image2,
-        bin_delta=frc_bin_delta,
-        spacing=spacing,
-        aggregate=aggregate,
-    )
-    return (
-        aggregate(image2_res[axis]) - aggregate(image1_res[axis])
-    ) * 1000  # return diff in nm
+    image1_res = frc_resolution(image1, bin_delta=bin_delta, spacing=spacing)
+    image2_res = frc_resolution(image2, bin_delta=bin_delta, spacing=spacing)
+    return (image2_res - image1_res) * 1000  # return diff in nm

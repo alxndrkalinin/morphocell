@@ -1,9 +1,10 @@
 """Contains a simple class for storing image data."""
 
-from typing import Sequence, Any
+from typing import Any
+from collections.abc import Sequence
 
-from .skimage import util
 from .cuda import to_device, get_device
+from .skimage import util
 
 
 class Image:
