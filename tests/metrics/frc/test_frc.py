@@ -1,3 +1,5 @@
+"""Tests for FRC and FSC resolution calculations."""
+
 from typing import Any
 from collections.abc import Sequence
 
@@ -100,6 +102,7 @@ def _assert_positive(result: Any) -> None:
 def test_calculate_frc_cpu_vs_gpu(
     cells_volume: tuple[np.ndarray, list[float]],
 ) -> None:
+    """Compare FRC resolution calculated on CPU and GPU."""
     volume, spacing = cells_volume
     slice_image = _middle_slice(volume)
 
@@ -117,6 +120,7 @@ def test_calculate_frc_cpu_vs_gpu(
 def test_calculate_fsc_cpu_vs_gpu(
     cells_volume: tuple[np.ndarray, list[float]],
 ) -> None:
+    """Compare FSC resolution calculated on CPU and GPU."""
     volume, spacing = cells_volume
 
     rng = np.random.default_rng(42)
