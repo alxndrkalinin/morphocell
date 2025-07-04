@@ -9,21 +9,21 @@ from functools import wraps
 import numpy as np
 from skimage.measure import marching_cubes
 
+_TRIMESH_AVAILABLE = False
 try:  # pragma: no cover - optional dependency
     import trimesh
     from trimesh.curvature import (
         discrete_mean_curvature_measure,
         discrete_gaussian_curvature_measure,
     )
-
-    _TRIMESH_AVAILABLE = True
-except Exception:  # pragma: no cover - import failure path
+except ImportError:  # pragma: no cover - import failure path
     trimesh = None
-    _TRIMESH_AVAILABLE = False
     warnings.warn(
         "trimesh is not installed. Mesh features are unavailable.",
         stacklevel=2,
     )
+else:
+    _TRIMESH_AVAILABLE = True
 
 from ..cuda import asnumpy
 
