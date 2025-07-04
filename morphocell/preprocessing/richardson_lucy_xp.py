@@ -1,4 +1,4 @@
-"""This module implements the Richardson-Lucy deconvolution algorithm using either NumPy or CuPy.
+"""Implement the Richardson-Lucy deconvolution algorithm using either NumPy or CuPy.
 
 Modified from https://github.com/True-North-Intelligent-Algorithms/tnia-python/blob/main/tnia/deconvolution/richardson_lucy.py
 

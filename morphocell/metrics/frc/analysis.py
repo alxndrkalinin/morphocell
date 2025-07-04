@@ -54,6 +54,8 @@
 # Copyright (c) 2009-2010, Laboratory of Systems Biology, Institute of
 # Cybernetics at Tallinn University of Technology. All rights reserved
 
+"""Utilities for Fourier ring and shell correlation analysis."""
+
 from argparse import Namespace
 
 import numpy as np
@@ -86,38 +88,40 @@ def get_frc_options(
 
 
 class FixedDictionary(object):
-    """A dictionary with immutable keys. Is initialized at construction
-    with a list of key values.
+    """Dictionary with a fixed set of keys.
+
+    Keys are defined at initialization and cannot be added later.
     """
 
     def __init__(self, keys):
+        """Create the dictionary with predefined ``keys``."""
         assert isinstance(keys, (list, tuple))
         self._dictionary = dict.fromkeys(keys)
 
     def __setitem__(self, key, value):
+        """Set ``value`` for ``key`` if it exists."""
         if key not in self._dictionary:
             raise KeyError(f"The key {key} is not defined")
         self._dictionary[key] = value
 
     def __getitem__(self, key):
+        """Return value associated with ``key``."""
         return self._dictionary[key]
 
     @property
     def keys(self):
+        """List of allowed keys."""
         return list(self._dictionary.keys())
 
     @property
     def contents(self):
+        """Return stored keys and values as lists."""
         return list(self._dictionary.keys()), list(self._dictionary.values())
 
 
 def safe_divide(numerator, denominator):
-    """Division of numpy arrays that can handle division by zero. NaN results are
-    coerced to zero. Also suppresses the division by zero warning.
-    :param numerator:
-    :param denominator:
-    :return:
-    """
+    """Divide arrays while ignoring divide-by-zero errors."""
+    # NaNs are coerced to zero and division warnings are suppressed
     with np.errstate(divide="ignore", invalid="ignore"):
         result = numerator / denominator
         result[result == np.inf] = 0.0
@@ -125,26 +129,31 @@ def safe_divide(numerator, denominator):
 
 
 class FourierCorrelationDataCollection(object):
-    """A container for the directional Fourier correlation data"""
+    """Container for directional Fourier correlation data."""
 
     def __init__(self):
+        """Create an empty collection."""
         self._data = {}
 
         self.iter_index = 0
 
     def __setitem__(self, key, value):
+        """Store ``value`` under integer ``key``."""
         assert isinstance(key, (int, np.integer))
         assert isinstance(value, FourierCorrelationData)
 
         self._data[str(key)] = value
 
     def __getitem__(self, key):
+        """Return data associated with ``key``."""
         return self._data[str(key)]
 
     def __iter__(self):
+        """Return iterator over stored datasets."""
         return self
 
     def __next__(self):
+        """Return next ``(key, value)`` pair."""
         try:
             item = list(self._data.items())[self.iter_index]
         except IndexError:
@@ -155,24 +164,29 @@ class FourierCorrelationDataCollection(object):
         return item
 
     def __len__(self):
+        """Return number of stored datasets."""
         return len(self._data)
 
     def clear(self):
+        """Remove all datasets from the collection."""
         self._data.clear()
 
     def items(self):
+        """Return a list of ``(key, value)`` pairs."""
         return list(self._data.items())
 
     def nitems(self):
+        """Alias for :func:`__len__`."""
         return len(self._data)
 
 
 class FourierCorrelationData(object):
-    """A datatype for FRC data"""
+    """Container for Fourier correlation data."""
 
     # todo: the dictionary format here is a bit clumsy. Maybe change to a simpler structure
 
     def __init__(self, data=None):
+        """Initialise the data structure with optional ``data`` mapping."""
         correlation_keys = (
             "correlation frequency points-x-bin curve-fit curve-fit-coefficients"
         )
@@ -197,9 +211,7 @@ class FourierCorrelationData(object):
 
 
 def fit_frc_curve(data_set, degree, fit_type="spline"):
-    """Calculate a least squares curve fit to the FRC Data
-    :return: None. Will modify the frc argument in place
-    """
+    """Return curve-fitting function for the provided FRC data."""
     assert isinstance(data_set, FourierCorrelationData)
 
     data = data_set.correlation["correlation"]
@@ -236,25 +248,14 @@ def fit_frc_curve(data_set, degree, fit_type="spline"):
 
 
 def calculate_snr_threshold_value(points_x_bin, snr):
-    """A function to calculate a SNR based resolution threshold, as described
-    in ...
-
-    :param points_x_bin: a 1D Array containing the numbers of points at each
-    FRC/FSC ring/shell
-    :param snr: the expected SNR value
-    :return:
-    """
+    """Return the SNR-based resolution threshold curve."""
     nominator = snr + safe_divide(2.0 * np.sqrt(snr) + 1, np.sqrt(points_x_bin))
     denominator = snr + 1 + safe_divide(2.0 * np.sqrt(snr), np.sqrt(points_x_bin))
     return safe_divide(nominator, denominator)
 
 
 def calculate_resolution_threshold_curve(data_set, criterion, threshold, snr):
-    """Calculate the two sigma curve. The FRC should be run first, as the results of the two sigma
-    depend on the number of points on the fourier rings.
-
-    :return:  Adds the
-    """
+    """Compute resolution threshold curve for a given criterion."""
     assert isinstance(data_set, FourierCorrelationData)
 
     points_x_bin = data_set.correlation["points-x-bin"]
@@ -305,6 +306,8 @@ def calculate_resolution_threshold_curve(data_set, criterion, threshold, snr):
 
 
 class FourierCorrelationAnalysis(object):
+    """Perform resolution analysis on a collection of FRC data."""
+
     def __init__(
         self,
         data: FourierCorrelationDataCollection,
@@ -317,6 +320,7 @@ class FourierCorrelationAnalysis(object):
         curve_fit_degree: int = 3,
         verbose: bool = False,
     ) -> None:
+        """Store configuration for subsequent analysis."""
         assert isinstance(data, FourierCorrelationDataCollection)
 
         self.data_collection = data
@@ -329,11 +333,7 @@ class FourierCorrelationAnalysis(object):
         self.verbose = verbose
 
     def execute(self, z_correction=1):
-        """Calculate the spatial resolution as a cross-section of the FRC and Two-sigma curves.
-
-        :return: Returns the calculation results. They are also saved inside the class.
-                 The return value is just for convenience.
-        """
+        """Calculate spatial resolution for all datasets."""
         criterion = self.resolution_threshold
         threshold = self.threshold_value
         snr = self.snr_value
@@ -384,6 +384,7 @@ class FourierCorrelationAnalysis(object):
         z_correction,
         verbose,
     ):
+        """Process a single dataset and return updated data."""
         if verbose:
             print(f"Calculating resolution point for dataset {key}")
 
