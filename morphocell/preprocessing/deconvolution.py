@@ -1,24 +1,19 @@
 """Utility functions for 3D image deconvolution."""
 
-from functools import partial
-from pathlib import Path
-from collections.abc import Callable
 from typing import Any
+from functools import partial
+from collections.abc import Callable
 
 import numpy as np
 
-from skimage import io
 from morphocell.skimage import restoration, util  # noqa: F401
-import math
-
-from morphocell.image_utils import pad_image, pad_image_to_shape, crop_center
+from morphocell.image_utils import pad_image
 from morphocell.cuda import (
     asnumpy,
-    ascupy,
     check_same_device,
-    get_array_module,
     to_same_device,
 )
+from .richardson_lucy_xp import richardson_lucy_xp
 
 
 def richardson_lucy_skimage(
@@ -41,7 +36,7 @@ def richardson_lucy_skimage(
     if observer_fn is None:
         return rl_partial(image, num_iter=n_iter)
 
-    estimate = image.copy()
+    estimate = image
     for i in range(1, n_iter + 1):
         estimate = rl_partial(estimate, num_iter=1)
         observer_fn(estimate, i)
@@ -87,78 +82,6 @@ def decon_skimage(
     return decon_image
 
 
-def richardson_lucy_xp(
-    image: np.ndarray,
-    psf: np.ndarray,
-    n_iter: int = 10,
-    *,
-    noncirc: bool = False,
-    mask: np.ndarray | None = None,
-    observer_fn: Callable | None = None,
-) -> np.ndarray:
-    """Lucy-Richardson deconvolution implemented with NumPy or CuPy."""
-    xp = get_array_module(image)
-
-    image = util.img_as_float(image)
-    psf = util.img_as_float(psf)
-
-    if not noncirc and image.shape != psf.shape:
-        psf = pad_image_to_shape(psf, image.shape, mode="constant")
-
-    mask_values = None
-    if mask is not None:
-        mask = util.img_as_float(mask)
-        mask_values = image * (1 - mask)
-        image *= mask
-
-    if noncirc:
-        orig_size = image.shape
-        ext_size = [image.shape[i] + psf.shape[i] - 1 for i in range(image.ndim)]
-        psf = pad_image_to_shape(psf, ext_size, mode="constant")
-
-    psf = xp.fft.fftn(xp.fft.ifftshift(psf))
-    otf_conj = xp.conjugate(psf)
-
-    if noncirc:
-        image = pad_image_to_shape(image, ext_size, mode="constant")
-        estimate = xp.full_like(image, xp.mean(image))
-    else:
-        estimate = image
-
-    if mask is not None:
-        htones = xp.ones_like(image) * mask
-    else:
-        htones = xp.ones_like(image)
-
-    htones = xp.real(xp.fft.ifftn(xp.fft.fftn(htones) * otf_conj))
-    htones[htones < 1e-6] = 1
-
-    for i in range(1, n_iter + 1):
-        reblurred = xp.real(xp.fft.ifftn(xp.fft.fftn(estimate) * psf))
-        ratio = image / (reblurred + 1e-6)
-        correction = xp.real(xp.fft.ifftn(xp.fft.fftn(ratio) * otf_conj))
-
-        correction[correction < 0] = 0
-        estimate = estimate * correction / htones
-
-        if observer_fn is not None:
-            if noncirc:
-                unpadded_estimate = crop_center(estimate, orig_size)
-                observer_fn(unpadded_estimate, i)
-            else:
-                observer_fn(estimate, i)
-
-    del psf, otf_conj, htones
-
-    if noncirc:
-        estimate = crop_center(estimate, orig_size)
-
-    if mask is not None:
-        estimate = estimate * mask + mask_values
-
-    return estimate
-
-
 def decon_xpy(
     image: np.ndarray,
     psf: np.ndarray,
@@ -198,18 +121,94 @@ def decon_xpy(
     return decon_image
 
 
+def richardson_lucy_iter(
+    image: np.ndarray,
+    psf: np.ndarray,
+    n_iter: int = 10,
+    implementation: str = "xp",
+    pad_psf: bool = False,
+    pad_size_z: int = 0,
+    observer_fn: Callable | None = None,
+    clip: bool = True,
+    filter_epsilon: float | None = None,
+    noncirc: bool = False,
+    mask: np.ndarray | None = None,
+) -> np.ndarray:
+    """Unified Richardson-Lucy deconvolution function with iteration observer function.
+    
+    Parameters
+    ----------
+    image : np.ndarray
+        Input image to deconvolve.
+    psf : np.ndarray
+        Point spread function.
+    n_iter : int, default=10
+        Number of iterations.
+    implementation : str, default="xp"
+        Implementation to use: "skimage" or "xp".
+    pad_psf : bool, default=False
+        Whether to pad the PSF along with the image.
+    pad_size_z : int, default=0
+        Number of slices to pad in z-dimension.
+    observer_fn : Callable | None, default=None
+        Function to call after each iteration.
+    clip : bool, default=True
+        Whether to clip values (skimage only).
+    filter_epsilon : float | None, default=None
+        Filter epsilon parameter (skimage only).
+    noncirc : bool, default=False
+        Enable non-circulant edge handling (xp only).
+    mask : np.ndarray | None, default=None
+        Mask array (xp only).
+        
+    Returns
+    -------
+    np.ndarray
+        Deconvolved image.
+        
+    Raises
+    ------
+    ValueError
+        If implementation is not "skimage" or "xp".
+    """
+    if implementation == "skimage":
+        return decon_skimage(
+            image=image,
+            psf=psf,
+            n_iter=n_iter,
+            pad_psf=pad_psf,
+            pad_size_z=pad_size_z,
+            observer_fn=observer_fn,
+            clip=clip,
+            filter_epsilon=filter_epsilon,
+        )
+    elif implementation == "xp":
+        return decon_xpy(
+            image=image,
+            psf=psf,
+            n_iter=n_iter,
+            pad_psf=pad_psf,
+            pad_size_z=pad_size_z,
+            noncirc=noncirc,
+            mask=mask,
+            observer_fn=observer_fn,
+        )
+    else:
+        raise ValueError(f"Unknown implementation: {implementation}. Use 'skimage' or 'xp'.")
+
+
+
 def deconv_iter_num_finder(
-    image: str | Path | np.ndarray,
-    psf: str | Path | np.ndarray,
+    image: np.ndarray,
+    psf: np.ndarray,
     metric_fn: Callable,
     metric_threshold: int | float,
     metric_kwargs: dict[str, Any] | None = None,
     max_iter: int = 25,
     pad_size_z: int = 1,
     verbose: bool = False,
-    implementation: str = "skimage",
+    implementation: str = "xpy",
     noncirc: bool = False,
-    use_gpu: bool = False,
 ) -> tuple[int, list[dict[str, int | float | np.ndarray]]]:
     """Find number of LR deconvolution iterations using an image similarity metric.
 
@@ -221,15 +220,6 @@ def deconv_iter_num_finder(
         When ``implementation='xpy'``, enable non-circulant edge handling.
     """
     verboseprint = print if verbose else lambda *a, **k: None
-
-    if isinstance(image, (str, Path)):
-        image = io.imread(str(image))
-    if isinstance(psf, (str, Path)):
-        psf = io.imread(str(psf))
-
-    if use_gpu:
-        image = ascupy(image)
-        psf = ascupy(psf)
 
     image = util.img_as_float(image)
     psf = util.img_as_float(psf)
