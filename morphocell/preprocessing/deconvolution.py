@@ -6,7 +6,6 @@ from collections.abc import Callable
 from typing import Any
 
 import numpy as np
-import numpy.typing as npt
 
 from skimage import io
 from morphocell.skimage import restoration, util  # noqa: F401
@@ -23,8 +22,8 @@ from morphocell.cuda import (
 
 
 def richardson_lucy_skimage(
-    image: npt.ArrayLike,
-    psf: npt.ArrayLike,
+    image: np.array,
+    psf: np.array,
     n_iter: int = 10,
     observer_fn: Callable | None = None,
     clip: bool = True,
@@ -66,12 +65,10 @@ def decon_skimage(
     padded_img = pad_image(image, pad_size_z, mode="reflect")
     padded_psf = pad_image(psf, pad_size_z, mode="reflect") if pad_psf else psf
 
-    # Create wrapper observer that handles postprocessing
     wrapper_observer = None
     if observer_fn is not None:
 
         def wrapper_observer(restored_image, i, *args):
-            # Apply same postprocessing as final result
             processed_image = restored_image[
                 pad_size_z : image.shape[0] + pad_size_z, :, :
             ]
@@ -91,7 +88,7 @@ def decon_skimage(
 
 
 def _pad_nd(
-    img: npt.ArrayLike,
+    img: np.array,
     padded_size: tuple[int, ...],
     mode: str,
     xp: Any,
@@ -104,7 +101,7 @@ def _pad_nd(
     return xp.pad(img, padding, mode), padding
 
 
-def _unpad_nd(padded: npt.ArrayLike, img_size: tuple[int, ...], xp: Any) -> np.ndarray:
+def _unpad_nd(padded: np.array, img_size: tuple[int, ...], xp: Any) -> np.ndarray:
     """Crop padded array back to ``img_size``."""
     padding = tuple(
         (math.ceil((i - j) / 2), math.floor((i - j) / 2))
@@ -115,12 +112,12 @@ def _unpad_nd(padded: npt.ArrayLike, img_size: tuple[int, ...], xp: Any) -> np.n
 
 
 def richardson_lucy_xp(
-    image: npt.ArrayLike,
-    psf: npt.ArrayLike,
+    image: np.array,
+    psf: np.array,
     n_iter: int = 10,
     *,
     noncirc: bool = False,
-    mask: npt.ArrayLike | None = None,
+    mask: np.array | None = None,
     observer_fn: Callable | None = None,
 ) -> np.ndarray:
     """Lucy-Richardson deconvolution implemented with NumPy or CuPy."""
@@ -194,7 +191,7 @@ def decon_xpy(
     pad_size_z: int = 0,
     *,
     noncirc: bool = False,
-    mask: npt.ArrayLike | None = None,
+    mask: np.array | None = None,
     observer_fn: Callable | None = None,
 ) -> np.ndarray:
     """Perform NumPy-based deconvolution with optional non-circulant edges."""
@@ -203,12 +200,10 @@ def decon_xpy(
     padded_img = pad_image(image, pad_size_z, mode="reflect")
     padded_psf = pad_image(psf, pad_size_z, mode="reflect") if pad_psf else psf
 
-    # Create wrapper observer that handles postprocessing
     wrapper_observer = None
     if observer_fn is not None:
 
         def wrapper_observer(restored_image, i, *args):
-            # Apply same postprocessing as final result
             processed_image = restored_image[
                 pad_size_z : image.shape[0] + pad_size_z, :, :
             ]
@@ -228,15 +223,14 @@ def decon_xpy(
 
 
 def deconv_iter_num_finder(
-    image: str | Path | npt.ArrayLike,
-    psf: str | Path | npt.ArrayLike,
+    image: str | Path | np.array,
+    psf: str | Path | np.array,
     metric_fn: Callable,
     metric_threshold: int | float,
     metric_kwargs: dict[str, Any] | None = None,
     max_iter: int = 25,
     pad_size_z: int = 1,
     verbose: bool = False,
-    subprocess_cuda: bool = False,
     implementation: str = "skimage",
     noncirc: bool = False,
     use_gpu: bool = False,
@@ -279,11 +273,8 @@ def deconv_iter_num_finder(
             if thresh_iter > 0:
                 return
 
-            # No postprocessing needed - deconvolution functions handle it
-            curr_image = restored_image
-
-            prev_iter_image = to_same_device(results[-1]["iter_image"], curr_image)
-            metric_result = metric_fn(prev_iter_image, curr_image, **metric_kwargs)
+            prev_iter_image = to_same_device(results[-1]["iter_image"], restored_image)
+            metric_result = metric_fn(prev_iter_image, restored_image, **metric_kwargs)
 
             metric_gain = (
                 metric_result[0] if isinstance(metric_result, tuple) else metric_result
@@ -292,7 +283,7 @@ def deconv_iter_num_finder(
             results.append(
                 {
                     "metric_gain": float(metric_gain),
-                    "iter_image": asnumpy(curr_image),
+                    "iter_image": asnumpy(restored_image),
                     "metric_result": metric_result,
                 }
             )
@@ -301,8 +292,8 @@ def deconv_iter_num_finder(
             if (i > 1) and (metric_gain > metric_threshold):
                 thresh_iter = i
                 metric_gain_total = metric_fn(
-                    to_same_device(results[0]["iter_image"], curr_image),
-                    curr_image,
+                    to_same_device(results[0]["iter_image"], restored_image),
+                    restored_image,
                     **metric_kwargs,
                 )
                 if isinstance(metric_gain_total, tuple):
