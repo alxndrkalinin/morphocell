@@ -1,8 +1,7 @@
 """Implement pre- and post-processing for segmentation."""
 
 import warnings
-
-from typing import Optional, Sequence
+from collections.abc import Sequence
 import numpy.typing as npt
 
 import numpy as np
@@ -93,10 +92,10 @@ def check_labeled_binary(image):
 
 def cleanup_segmentation(
     label_img: npt.ArrayLike,
-    min_obj_size: Optional[int] = None,
-    max_obj_size: Optional[int] = None,
-    border_buffer_size: Optional[int] = None,
-    max_hole_size: Optional[int] = None,
+    min_obj_size: int | None = None,
+    max_obj_size: int | None = None,
+    border_buffer_size: int | None = None,
+    max_hole_size: int | None = None,
 ) -> npt.ArrayLike:
     """Clean up segmented image by removing small objects, clearing borders, and closing holes."""
     check_labeled_binary(label_img)
@@ -325,7 +324,7 @@ def fill_holes_slicer(
     image: npt.ArrayLike,
     area_threshold: int = 1000,
     num_iterations: int = 1,
-    axes: Optional[Sequence[int]] = None,
+    axes: Sequence[int] | None = None,
 ):
     """
     Fill holes in slices of binary or labeled objects.

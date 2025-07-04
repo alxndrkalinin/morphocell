@@ -38,7 +38,7 @@
 # mypy: ignore-errors
 
 from math import floor
-from typing import Iterable
+from collections.abc import Iterable
 
 import numpy as np
 

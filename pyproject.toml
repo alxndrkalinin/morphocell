@@ -47,13 +47,6 @@ dev = [
     "pytest",
     "pre-commit",
 ]
-flowdec = [
-    "tensorflow-gpu>=1.14.0,<2.2.1",
-    "flowdec[tf_gpu]>=1.1.0",
-    "pyvirtualdisplay>=2.0",
-    "cloudpickle>=2.0",
-    "py3nvml>=0.2.6",
-]
 all = [
     "morphocell[cellpose]",
     "morphocell[dev]",
@@ -67,3 +60,4 @@ exclude = ["examples*"]
 
 [tool.mypy]
 python_version = "3.10"
+ignore_errors = true

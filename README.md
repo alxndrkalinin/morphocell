@@ -14,7 +14,7 @@ CPU based approaches.
 * Python >=3.10
 * Ubuntu 18.04
 * CUDA 11.2-12.1
-* Optional: TensorFlow/Flowdec for deconvolution, Cellpose for segmentation
+* Optional: Cellpose for segmentation
 
 ### Installation
 Clone the repository and install the base library:
@@ -28,8 +28,6 @@ pip install -e .
 Optional extras from `pyproject.toml` enable additional functionality:
 
 ```bash
-# GPU accelerated deconvolution
-pip install -e '.[decon]'
 # resolution metrics
 pip install -e '.[frc]'
 # segmentation via Cellpose

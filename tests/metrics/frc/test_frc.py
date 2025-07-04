@@ -1,4 +1,5 @@
-from typing import Sequence, Any
+from collections.abc import Sequence
+from typing import Any
 
 import pytest
 import numpy as np
