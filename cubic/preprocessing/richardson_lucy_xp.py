@@ -39,12 +39,12 @@ from collections.abc import Callable
 
 import numpy as np
 
-from morphocell.cuda import (
+from cubic.cuda import (
     get_array_module,
     check_same_device,
 )
-from morphocell.skimage import util
-from morphocell.image_utils import crop_center, pad_image_to_shape
+from cubic.skimage import util
+from cubic.image_utils import crop_center, pad_image_to_shape
 
 
 def richardson_lucy_xp(

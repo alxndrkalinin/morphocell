@@ -4,8 +4,8 @@ from collections.abc import Callable, Sequence
 
 import numpy as np
 
-from morphocell.cuda import asnumpy
-from morphocell.image_utils import (
+from cubic.cuda import asnumpy
+from cubic.image_utils import (
     crop_bl,
     crop_br,
     crop_tl,

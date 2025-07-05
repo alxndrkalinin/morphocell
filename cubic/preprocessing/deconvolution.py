@@ -6,13 +6,13 @@ from collections.abc import Callable
 
 import numpy as np
 
-from morphocell.cuda import (
+from cubic.cuda import (
     asnumpy,
     to_same_device,
     check_same_device,
 )
-from morphocell.skimage import util, restoration  # noqa: F401
-from morphocell.image_utils import pad_image
+from cubic.skimage import util, restoration  # noqa: F401
+from cubic.image_utils import pad_image
 
 from .richardson_lucy_xp import richardson_lucy_xp
 
@@ -25,7 +25,7 @@ def richardson_lucy_skimage(
     clip: bool = True,
     filter_epsilon: float | None = None,
 ) -> np.ndarray:
-    """Lucy-Richardson deconvolution using morphocell.skimage."""
+    """Lucy-Richardson deconvolution using cubic.skimage."""
     rl_partial = partial(
         restoration.richardson_lucy,
         psf=psf,

@@ -54,7 +54,7 @@ def cellpose_segment(
     if not _CELLPOSE_AVAILABLE:
         raise ImportError(
             "Cellpose is required for this function, but not available. "
-            "Try re-installing with `pip install morphocell[cellpose]`."
+            "Try re-installing with `pip install cubic[cellpose]`."
         )
 
     image = downscale_and_filter(image, downscale_factor=downscale_factor)

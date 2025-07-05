@@ -7,9 +7,9 @@ import numpy as np
 import pytest
 from skimage import data
 
-from morphocell.cuda import CUDAManager, ascupy
-from morphocell.skimage import filters
-from morphocell.metrics.frc import frc_resolution, fsc_resolution
+from cubic.cuda import CUDAManager, ascupy
+from cubic.skimage import filters
+from cubic.metrics.frc import frc_resolution, fsc_resolution
 
 
 def _fractional_to_absolute(

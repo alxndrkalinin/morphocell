@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from morphocell.preprocessing.deconvolution import richardson_lucy_iter
+from cubic.preprocessing.deconvolution import richardson_lucy_iter
 
 
 def test_richardson_lucy_iter() -> None:

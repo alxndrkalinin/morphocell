@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-import morphocell.skimage as mc_skimage
-from morphocell.cuda import CUDAManager, ascupy, asnumpy
+import cubic.skimage as mc_skimage
+from cubic.cuda import CUDAManager, ascupy, asnumpy
 
 
 @pytest.mark.parametrize("use_gpu", [False, True])

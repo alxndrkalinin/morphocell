@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from morphocell.metrics.average_precision import compute_matches, average_precision
+from cubic.metrics.average_precision import compute_matches, average_precision
 
 
 def test_average_precision_perfect_match() -> None:

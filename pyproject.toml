@@ -3,7 +3,7 @@ requires = ["setuptools>=64.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "morphocell"
+name = "cubic"
 dynamic = ["version"]
 description = "CUDA-accelerated 3D BioImage Computing"
 readme = "README.md"
@@ -32,8 +32,8 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/alxndrkalinin/morphocell"
-Repository = "https://github.com/alxndrkalinin/morphocell"
+Homepage = "https://github.com/alxndrkalinin/cubic"
+Repository = "https://github.com/alxndrkalinin/cubic"
 
 [project.optional-dependencies]
 cellpose = [
@@ -50,13 +50,13 @@ dev = [
     "pre-commit",
 ]
 all = [
-    "morphocell[cellpose]",
-    "morphocell[mesh]",
-    "morphocell[dev]",
+    "cubic[cellpose]",
+    "cubic[mesh]",
+    "cubic[dev]",
 ]
 
 [tool.setuptools.dynamic]
-version = { attr = "morphocell.__version__" }
+version = { attr = "cubic.__version__" }
 
 [tool.setuptools.packages.find]
 exclude = ["examples*"]

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from morphocell.feature import voxel
+from cubic.feature import voxel
 
 
 def test_regionprops_extract_features() -> None:

@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from morphocell.cuda import (
+from cubic.cuda import (
     ascupy,
     asnumpy,
     to_device,

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from morphocell.preprocessing.thresholding import (
+from cubic.preprocessing.thresholding import (
     get_threshold_otsu,
     select_nonempty_patches,
 )

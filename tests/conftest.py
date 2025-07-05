@@ -2,7 +2,7 @@
 
 import pytest
 
-from morphocell.cuda import CUDAManager
+from cubic.cuda import CUDAManager
 
 
 @pytest.fixture(scope="session")

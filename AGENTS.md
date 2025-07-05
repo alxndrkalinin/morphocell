@@ -1,14 +1,14 @@
 # Project Guide for AI Agents
 
-This file provides guidance for AI agents working with the **morphocell** repository.
+This file provides guidance for AI agents working with the **cubic** repository.
 
 ## Project Overview
 
-*morphocell* is a Python library for morphometric analysis of multidimensional bioimages with optional CUDA acceleration.  Source code lives under the `morphocell/` package and tests are located in `tests/`.
+*cubic* is a Python library for morphometric analysis of multidimensional bioimages with optional CUDA acceleration.  Source code lives under the `cubic/` package and tests are located in `tests/`.
 
 ## Directory Structure
 
-- `morphocell/` – Python package containing all library modules
+- `cubic/` – Python package containing all library modules
 - `tests/` – pytest test suite
 - `examples/` – example notebooks and data (read‑only)
 - `build/` – build artefacts (should not be modified)
@@ -28,7 +28,7 @@ Before committing, ensure the following commands succeed from the repository roo
 ```bash
 ruff check .
 ruff format --check .
-mypy --ignore-missing-imports morphocell/
+mypy --ignore-missing-imports cubic/
 pytest
 ```
 

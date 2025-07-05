@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from morphocell.segmentation.cellpose import cellpose_segment
+from cubic.segmentation.cellpose import cellpose_segment
 
 
 def test_cellpose_import_error() -> None:

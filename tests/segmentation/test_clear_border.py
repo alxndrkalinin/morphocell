@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from morphocell.segmentation._clear_border import clear_border
+from cubic.segmentation._clear_border import clear_border
 
 
 def test_clear_border_simple() -> None:

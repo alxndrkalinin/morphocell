@@ -42,8 +42,8 @@ from collections.abc import Iterable
 
 import numpy as np
 
-from morphocell.skimage import exposure
-from morphocell.image_utils import rotate_image
+from cubic.skimage import exposure
+from cubic.image_utils import rotate_image
 
 # ---------------------------------------------------------------------------
 # Helper utilities

@@ -37,7 +37,7 @@ def _require_trimesh(func: F) -> F:
     def wrapper(*args: Any, **kwargs: Any) -> Any:
         if not _TRIMESH_AVAILABLE:
             raise RuntimeError(
-                "trimesh is required for mesh operations. Install with 'morphocell[mesh]'"
+                "trimesh is required for mesh operations. Install with 'cubic[mesh]'"
             )
         return func(*args, **kwargs)
 

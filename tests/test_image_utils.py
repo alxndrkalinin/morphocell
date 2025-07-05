@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from morphocell.cuda import ascupy, asnumpy
-from morphocell.image_utils import (
+from cubic.cuda import ascupy, asnumpy
+from cubic.image_utils import (
     rotate_image,
     pad_image_to_cube,
     select_max_contrast_slices,

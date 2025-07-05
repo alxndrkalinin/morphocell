@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from morphocell.metrics.skimage_metrics import psnr, ssim, nrmse
+from cubic.metrics.skimage_metrics import psnr, ssim, nrmse
 
 
 def test_nrmse_scale_invariant() -> None:

@@ -21,4 +21,4 @@ jobs:
     - name: run ruff formatter check
       run: ruff format --check .
     - name: run mypy
-      run: mypy --ignore-missing-imports morphocell/
+      run: mypy --ignore-missing-imports cubic/
