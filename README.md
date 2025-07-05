@@ -13,7 +13,7 @@ CPU based approaches.
 ### Dependencies
 * Python >=3.10
 * numpy/scipy/scikit-image
-* [optional] CUDA 11.2-12.1
+* [optional] CUDA 11.x-12.x, cupy, cuCIM
 * [optional] Cellpose for segmentation
 
 ### Installation
