@@ -20,9 +20,7 @@ CPU based approaches.
 Clone the repository and install the base library:
 
 ```bash
-git clone https://github.com/alxndrkalinin/morphocell.git
-cd morphocell
-pip install -e .
+pip install morphocell
 ```
 
 Optional extras from `pyproject.toml` enable additional functionality:
